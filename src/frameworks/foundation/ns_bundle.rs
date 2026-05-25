@@ -48,6 +48,7 @@ pub struct State {
     localization_tables: HashMap<id, id>, // NSString* → NSDictionary*
 }
 
+#[derive(Default)]
 pub struct NSBundleHostObject {
     /// If this is None, this is the main bundle's NSBundle instance and the
     /// Bundle is stored in crate::Environment, not here.

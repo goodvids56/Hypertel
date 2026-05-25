@@ -10,6 +10,7 @@ use crate::frameworks::foundation::ns_string::{from_rust_string, to_rust_string}
 use crate::frameworks::foundation::NSUInteger;
 use crate::objc::{id, msg, msg_class, nil, objc_classes, ClassExports, HostObject, NSZonePtr};
 
+#[derive(Default)]
 struct NSNumberFormatterHostObject {
     number_style: NSUInteger,
     locale: id,

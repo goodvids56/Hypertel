@@ -102,6 +102,13 @@ enum StringHostObject {
     Utf8(Cow<'static, str>),
     Utf16(Utf16String),
 }
+impl Default for StringHostObject {
+    // Phantom-fallback value; an empty borrowed UTF-8 string is the natural
+    // "no content" form and doesn't allocate.
+    fn default() -> Self {
+        StringHostObject::Utf8(Cow::Borrowed(""))
+    }
+}
 impl HostObject for StringHostObject {}
 impl StringHostObject {
     fn decode(bytes: Cow<[u8]>, encoding: NSStringEncoding) -> StringHostObject {

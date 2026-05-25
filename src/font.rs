@@ -18,9 +18,37 @@ use rusttype::{vector, GlyphId, Point, Scale};
 use std::io::Read;
 
 pub struct Font {
-    font: rusttype::Font<'static>,
+    /// `None` only for the phantom-default `Font` returned via
+    /// [`Default`] when the objc runtime needs a placeholder for a
+    /// missing/wrong-typed host object. Real `Font`s constructed via
+    /// the `mono_regular()` / `from_file()` / etc. helpers always set
+    /// this to `Some(...)`.
+    font: Option<rusttype::Font<'static>>,
     /// Raw font file bytes — needed for TrueType table access (CGFontCopyTableForTag).
     raw_data: Option<Vec<u8>>,
+}
+
+impl Default for Font {
+    fn default() -> Self {
+        Font {
+            font: None,
+            raw_data: None,
+        }
+    }
+}
+
+impl Font {
+    /// Panic with a clear message if someone tries to use a phantom/default
+    /// `Font` (one without an actual `rusttype::Font` loaded) — this
+    /// indicates a programming bug elsewhere, since the only path that
+    /// produces such a `Font` is the `objc::ObjC::borrow` fallback used
+    /// for missing/wrong-typed host objects.
+    fn rt(&self) -> &rusttype::Font<'static> {
+        self.font.as_ref().expect(
+            "tried to use methods on an uninitialised Font \
+             (likely a phantom-fallback host object)",
+        )
+    }
 }
 
 pub enum TextAlignment {
@@ -70,12 +98,12 @@ impl RasterGlyph<'_> {
 
 impl Font {
     pub fn glyph_id_for_char(&self, c: u16) -> GlyphId {
-        self.font.glyph(char::from_u32(c as u32).unwrap()).id()
+        self.rt().glyph(char::from_u32(c as u32).unwrap()).id()
     }
 
     /// Returns the total number of glyphs in the font.
     pub fn glyph_count(&self) -> u32 {
-        self.font.glyph_count() as u32
+        self.rt().glyph_count() as u32
     }
 
     /// Returns the units-per-em value from the font. rusttype normalizes to
@@ -97,14 +125,14 @@ impl Font {
     /// Returns the advance width (in design units) for a glyph.
     pub fn glyph_advance(&self, glyph_id: GlyphId) -> i32 {
         let upm = self.units_per_em() as f32;
-        let g = self.font.glyph(glyph_id).scaled(Scale::uniform(upm));
+        let g = self.rt().glyph(glyph_id).scaled(Scale::uniform(upm));
         g.h_metrics().advance_width.round() as i32
     }
 
     /// Returns the left side bearing (in design units) for a glyph.
     pub fn glyph_left_side_bearing(&self, glyph_id: GlyphId) -> i32 {
         let upm = self.units_per_em() as f32;
-        let g = self.font.glyph(glyph_id).scaled(Scale::uniform(upm));
+        let g = self.rt().glyph(glyph_id).scaled(Scale::uniform(upm));
         g.h_metrics().left_side_bearing.round() as i32
     }
 
@@ -113,9 +141,7 @@ impl Font {
     /// returns a zero rect.
     pub fn glyph_bbox(&self, glyph_id: GlyphId) -> (f32, f32, f32, f32) {
         let upm = self.units_per_em() as f32;
-        let g = self
-            .font
-            .glyph(glyph_id)
+        let g = self.rt().glyph(glyph_id)
             .scaled(Scale::uniform(upm))
             .positioned(Point { x: 0.0, y: 0.0 });
         match g.pixel_bounding_box() {
@@ -181,7 +207,7 @@ impl Font {
         };
 
         Font {
-            font,
+            font: Some(font),
             raw_data: Some(raw_copy),
         }
     }
@@ -193,7 +219,7 @@ impl Font {
         };
 
         Font {
-            font,
+            font: Some(font),
             raw_data: Some(raw_copy),
         }
     }
@@ -242,21 +268,21 @@ impl Font {
     }
 
     pub fn ascent(&self, font_size: f32) -> f32 {
-        let v_metrics = self.font.v_metrics(scale(font_size));
+        let v_metrics = self.rt().v_metrics(scale(font_size));
         v_metrics.ascent
     }
     pub fn descent(&self, font_size: f32) -> f32 {
-        let v_metrics = self.font.v_metrics(scale(font_size));
+        let v_metrics = self.rt().v_metrics(scale(font_size));
         v_metrics.descent
     }
 
     pub fn line_gap(&self, font_size: f32) -> f32 {
-        let v_metrics = self.font.v_metrics(scale(font_size));
+        let v_metrics = self.rt().v_metrics(scale(font_size));
         v_metrics.line_gap
     }
 
     fn line_height_and_gap(&self, font_size: f32) -> (f32, f32) {
-        let v_metrics = self.font.v_metrics(scale(font_size));
+        let v_metrics = self.rt().v_metrics(scale(font_size));
         (v_metrics.ascent - v_metrics.descent, v_metrics.line_gap)
     }
 
@@ -265,7 +291,7 @@ impl Font {
         let mut line_x_min: f32 = 0.0;
         let mut line_x_max: f32 = 0.0;
 
-        for glyph in self.font.layout(line, scale(font_size), Default::default()) {
+        for glyph in self.rt().layout(line, scale(font_size), Default::default()) {
             let position = glyph.position();
             let h_metrics = glyph.unpositioned().h_metrics();
 
@@ -443,7 +469,7 @@ impl Font {
     ) {
         let lines = self.break_lines(font_size, text, wrap);
 
-        let ascent = self.font.v_metrics(scale(font_size)).ascent;
+        let ascent = self.rt().v_metrics(scale(font_size)).ascent;
         let (line_height, line_gap) = self.line_height_and_gap(font_size);
 
         // RustType requires a "draw pixel" callback that will be called for
@@ -467,7 +493,7 @@ impl Font {
 
             let baseline = origin.1 + ascent + line_idx as f32 * (line_gap + line_height);
 
-            for glyph in self.font.layout(
+            for glyph in self.rt().layout(
                 line_text,
                 scale(font_size),
                 Point {
@@ -538,13 +564,11 @@ impl Font {
             y: 0.0,
         };
         // This code is adapted from documentation of [rusttype::Font::layout].
-        let iter = self
-            .font
-            .glyphs_for(glyphs.into_iter())
+        let iter = self.rt().glyphs_for(glyphs.into_iter())
             .scan((None, 0.0), |(last, x), g| {
                 let g = g.scaled(scale(font_size));
                 if let Some(last) = last {
-                    *x += self.font.pair_kerning(scale(font_size), *last, g.id());
+                    *x += self.rt().pair_kerning(scale(font_size), *last, g.id());
                 }
                 let w = g.h_metrics().advance_width;
                 let next = g.positioned(start + vector(*x, 0.0));
@@ -605,9 +629,7 @@ impl Font {
             let x = origin.0 + pos.0;
             let y = origin.1 + pos.1;
 
-            let g = self
-                .font
-                .glyph(*glyph_id)
+            let g = self.rt().glyph(*glyph_id)
                 .scaled(scale(font_size))
                 .positioned(Point { x, y: 0.0 });
 
@@ -658,9 +680,7 @@ impl Font {
         let mut current_y = origin.1;
 
         for (i, glyph_id) in glyphs.iter().enumerate() {
-            let g = self
-                .font
-                .glyph(*glyph_id)
+            let g = self.rt().glyph(*glyph_id)
                 .scaled(scale(font_size))
                 .positioned(Point {
                     x: current_x,

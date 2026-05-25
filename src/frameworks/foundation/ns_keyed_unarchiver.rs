@@ -34,6 +34,7 @@ pub const CONSTANTS: ConstantExports = &[(
     HostConstant::NSString(NSKeyedArchiveRootObjectKey),
 )];
 
+#[derive(Default)]
 struct NSKeyedUnarchiverHostObject {
     plist: Dictionary,
     current_key: Option<Uid>,

@@ -18,6 +18,7 @@ use std::sync::{Arc, Condvar, Mutex};
 // NSInteger is i32 on 32-bit ARM.
 type NSInteger = i32;
 
+#[derive(Default)]
 struct NSLockHostObject {
     mutex_id: MutexId,
     name: id,

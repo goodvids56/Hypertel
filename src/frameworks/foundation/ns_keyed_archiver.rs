@@ -27,6 +27,7 @@ use crate::objc::{
 };
 use crate::Environment;
 
+#[derive(Default)]
 struct NSKeyedArchiverHostObject {
     plist: Dictionary,
     encoded_data: id, // NSData *

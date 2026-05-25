@@ -131,6 +131,7 @@ impl State {
 
 // MARK: - Host object
 
+#[derive(Default)]
 struct GKLocalPlayerHostObject {
     /// `NSString*`
     player_id: id,

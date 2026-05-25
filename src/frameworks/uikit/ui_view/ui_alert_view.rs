@@ -20,6 +20,7 @@ pub const UIAlertViewStyleSecureTextInput: UIAlertViewStyle = 1;
 pub const UIAlertViewStylePlainTextInput: UIAlertViewStyle = 2;
 pub const UIAlertViewStyleLoginAndPasswordInput: UIAlertViewStyle = 3;
 
+#[derive(Default)]
 pub struct UIAlertViewHostObject {
     title: id,
     message: id,

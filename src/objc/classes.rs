@@ -35,6 +35,7 @@ pub type Class = id;
 /// will look up method implementations.
 ///
 /// Note: `superclass` can be `nil`!
+#[derive(Default)]
 pub(super) struct ClassHostObject {
     pub(super) name: String,
     pub(super) is_metaclass: bool,

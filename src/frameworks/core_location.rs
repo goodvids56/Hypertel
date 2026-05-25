@@ -60,6 +60,7 @@ const CL_ACTIVITY_TYPE_OTHER_NAVIGATION: CLActivityType = 4;
 
 // MARK: - CLLocationManager host object
 
+#[derive(Default)]
 struct CLLocationManagerHostObject {
     delegate: id,
     desired_accuracy: CLLocationAccuracy,
@@ -77,6 +78,7 @@ impl HostObject for CLLocationManagerHostObject {}
 
 // MARK: - CLLocation host object
 
+#[derive(Default)]
 struct CLLocationHostObject {
     latitude: CLLocationDegrees,
     longitude: CLLocationDegrees,
@@ -92,6 +94,7 @@ impl HostObject for CLLocationHostObject {}
 
 // MARK: - CLHeading host object
 
+#[derive(Default)]
 struct CLHeadingHostObject {
     magnetic_heading: CLHeadingComponentValue,
     true_heading: CLHeadingComponentValue,

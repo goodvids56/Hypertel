@@ -52,6 +52,13 @@ enum CGDataProviderHostObject {
     CGImage(CGImageRef),
     CFData(CFDataRef),
 }
+impl Default for CGDataProviderHostObject {
+    // Phantom-fallback value; a `CFData(nil)` variant is the cheapest "no
+    // data" form and doesn't reference any guest memory.
+    fn default() -> Self {
+        CGDataProviderHostObject::CFData(nil)
+    }
+}
 impl HostObject for CGDataProviderHostObject {}
 
 pub const CLASSES: ClassExports = objc_classes! {

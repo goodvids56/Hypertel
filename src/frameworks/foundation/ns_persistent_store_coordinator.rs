@@ -16,6 +16,7 @@ use crate::objc::{
 
 // MARK: - NSPersistentStoreCoordinator
 
+#[derive(Default)]
 struct NSPersistentStoreCoordinatorHostObject {
     /// `NSManagedObjectModel*`
     managed_object_model: id,
@@ -26,6 +27,7 @@ impl HostObject for NSPersistentStoreCoordinatorHostObject {}
 
 // MARK: - NSPersistentStore
 
+#[derive(Default)]
 struct NSPersistentStoreHostObject {
     /// `NSString*`
     type_: id,
@@ -40,6 +42,7 @@ impl HostObject for NSPersistentStoreHostObject {}
 
 // MARK: - NSManagedObjectModel
 
+#[derive(Default)]
 struct NSManagedObjectModelHostObject {
     /// `NSArray<NSEntityDescription*>*`
     entities: id,
@@ -48,6 +51,7 @@ impl HostObject for NSManagedObjectModelHostObject {}
 
 // MARK: - NSManagedObjectContext
 
+#[derive(Default)]
 struct NSManagedObjectContextHostObject {
     /// `NSPersistentStoreCoordinator*`
     persistent_store_coordinator: id,
@@ -60,6 +64,7 @@ impl HostObject for NSManagedObjectContextHostObject {}
 
 // MARK: - NSManagedObject
 
+#[derive(Default)]
 struct NSManagedObjectHostObject {
     /// `NSEntityDescription*`
     entity: id,
@@ -70,6 +75,7 @@ impl HostObject for NSManagedObjectHostObject {}
 
 // MARK: - NSEntityDescription
 
+#[derive(Default)]
 struct NSEntityDescriptionHostObject {
     /// `NSString*`
     name: id,
@@ -82,6 +88,7 @@ impl HostObject for NSEntityDescriptionHostObject {}
 
 // MARK: - NSFetchRequest
 
+#[derive(Default)]
 struct NSFetchRequestHostObject {
     /// `NSEntityDescription*`
     entity: id,

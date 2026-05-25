@@ -27,6 +27,7 @@ const NS_URL_ERROR_NOT_CONNECTED_TO_INTERNET: i32 = -1009;
 // Host object — stores the delegate so we can call it back.
 // ---------------------------------------------------------------------------
 
+#[derive(Default)]
 struct NSURLConnectionHostObject {
     /// `id<NSURLConnectionDelegate>` — retained while the connection is
     /// alive, released on dealloc / cancel.

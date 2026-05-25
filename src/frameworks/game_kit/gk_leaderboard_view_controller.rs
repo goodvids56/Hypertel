@@ -26,6 +26,7 @@ const GKLeaderboardPlayerScopeFriendsOnly: GKLeaderboardPlayerScope = 1;
 
 // MARK: - GKLeaderboardViewController
 
+#[derive(Default)]
 struct GKLeaderboardViewControllerHostObject {
     /// GKLeaderboardViewControllerDelegate — weak reference
     leaderboard_delegate: id,
@@ -37,6 +38,7 @@ impl HostObject for GKLeaderboardViewControllerHostObject {}
 
 // MARK: - GKFriendRequestComposeViewController
 
+#[derive(Default)]
 struct GKFriendRequestComposeViewControllerHostObject {
     /// GKFriendRequestComposeViewControllerDelegate — weak reference
     compose_view_delegate: id,
@@ -49,6 +51,7 @@ impl HostObject for GKFriendRequestComposeViewControllerHostObject {}
 
 // MARK: - GKAchievementViewController
 
+#[derive(Default)]
 struct GKAchievementViewControllerHostObject {
     /// GKAchievementViewControllerDelegate — weak reference
     achievement_delegate: id,

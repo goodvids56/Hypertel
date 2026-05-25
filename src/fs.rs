@@ -258,7 +258,7 @@ impl ToOwned for GuestPath {
 }
 
 /// Like [PathBuf] but for the virtual filesystem.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct GuestPathBuf(String);
 impl From<String> for GuestPathBuf {
     fn from(string: String) -> GuestPathBuf {

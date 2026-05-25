@@ -50,6 +50,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 };
 
+#[derive(Default)]
 pub(super) struct CGContextHostObject {
     pub(super) subclass: CGContextSubclass,
     pub(super) rgb_fill_color: (CGFloat, CGFloat, CGFloat, CGFloat),
@@ -129,6 +130,13 @@ pub(super) struct CGContextState {
 
 pub(super) enum CGContextSubclass {
     CGBitmapContext(cg_bitmap_context::CGBitmapContextData),
+}
+impl Default for CGContextSubclass {
+    // Phantom-fallback for the objc `borrow` path; a default bitmap context
+    // with zero dimensions is the cheapest stable state.
+    fn default() -> Self {
+        CGContextSubclass::CGBitmapContext(Default::default())
+    }
 }
 
 pub type CGContextRef = CFTypeRef;

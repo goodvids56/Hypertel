@@ -13,6 +13,7 @@ use crate::objc::{
 use regex::Regex;
 
 /// Хост-объект для хранения скомпилированного регулярного выражения.
+#[derive(Default)]
 struct NSRegularExpressionHostObject {
     regex: Option<Regex>,
 }

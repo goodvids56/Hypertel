@@ -11,6 +11,7 @@ use crate::objc::{
 };
 use crate::Environment;
 
+#[derive(Default)]
 pub(super) struct UILocalNotificationHostObject {
     fire_date: id,
     time_zone: id,

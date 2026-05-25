@@ -28,6 +28,7 @@ pub struct State {
     pub(super) ignoring_interaction_events_count: u32,
 }
 
+#[derive(Default)]
 struct UIApplicationHostObject {
     delegate: id,
     delegate_is_retained: bool,

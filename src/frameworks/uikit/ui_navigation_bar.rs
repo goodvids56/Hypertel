@@ -18,6 +18,7 @@ const UIBarStyleBlack: UIBarStyle = 1;
 const UIBarStyleBlackOpaque: UIBarStyle = 2;
 const UIBarStyleBlackTranslucent: UIBarStyle = 3;
 
+#[derive(Default)]
 struct UINavigationBarHostObject {
     /// UINavigationBarDelegate — weak reference
     delegate: id,
@@ -37,6 +38,7 @@ impl HostObject for UINavigationBarHostObject {}
 
 // MARK: - UINavigationItem
 
+#[derive(Default)]
 struct UINavigationItemHostObject {
     title: id,        // NSString* — retained
     title_view: id,   // UIView* — retained

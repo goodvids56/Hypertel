@@ -13,6 +13,7 @@ use crate::mem::{ConstPtr, ConstVoidPtr};
 use crate::objc::{autorelease, id, nil, objc_classes, ClassExports, HostObject};
 use crate::{msg, msg_class};
 
+#[derive(Default)]
 struct NSFileHandleHostObject {
     fd: posix_io::FileDescriptor,
 }

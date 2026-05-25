@@ -208,11 +208,13 @@ pub const CONSTANTS: ConstantExports = &[
 
 // MARK: - ObjC backing classes
 
+#[derive(Default)]
 struct CFReadStreamHostObject {
     status: CFStreamStatus,
 }
 impl HostObject for CFReadStreamHostObject {}
 
+#[derive(Default)]
 struct CFWriteStreamHostObject {
     status: CFStreamStatus,
 }

@@ -324,6 +324,16 @@ pub fn init_with_objects_and_keys(
 
 /// Helper function to share `initWithDictionary:` implementations
 fn init_with_dictionary_common(env: &mut Environment, this: id, other_dict: id) -> id {
+    // Apple's `-[NSDictionary initWithDictionary:nil]` returns an empty
+    // dictionary instead of crashing. Guard against guest code calling us
+    // with `nil` (or a non-dictionary object that has no host record)
+    // before we try to swap host objects, so we don't have to rely on the
+    // objc phantom-fallback path producing a valid empty `HashMap`.
+    if other_dict == nil {
+        *env.objc.borrow_mut(this) = <DictionaryHostObject as Default>::default();
+        return this;
+    }
+
     let other_host_object: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other_dict));
     let mut host_object = <DictionaryHostObject as Default>::default();
 

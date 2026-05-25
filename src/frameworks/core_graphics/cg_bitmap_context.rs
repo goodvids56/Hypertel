@@ -25,6 +25,7 @@ use crate::objc::ObjC;
 use crate::Environment;
 
 #[derive(Copy, Clone)]
+#[derive(Default)]
 pub(super) struct CGBitmapContextData {
     pub(super) data: MutVoidPtr,
     pub(super) data_is_owned: bool,

@@ -287,6 +287,7 @@ pub const CONSTANTS: ConstantExports = &[
     ),
 ];
 
+#[derive(Default)]
 struct MPMoviePlayerControllerHostObject {
     // NSURL *
     content_url: id,

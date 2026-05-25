@@ -35,7 +35,7 @@ use crate::objc::{
 use crate::Environment;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub(super) struct CALayerHostObject {
     delegate: id,
     pub(super) sublayers: Vec<id>,

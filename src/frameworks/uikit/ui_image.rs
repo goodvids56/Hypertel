@@ -38,6 +38,7 @@ impl State {
 
 // В iOS 2-4 stretchableImage хранило параметры leftCapWidth и topCapHeight
 // прямо в объекте.
+#[derive(Default)]
 struct UIImageHostObject {
     cg_image: CGImageRef,
     orientation: NSInteger, // UIImageOrientation

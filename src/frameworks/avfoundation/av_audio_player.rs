@@ -35,6 +35,7 @@ use crate::Environment;
 
 const kNumberBuffers: usize = 3;
 
+#[derive(Default)]
 struct AVAudioRecorderHostObject {
     url: id,
     is_recording: bool,
@@ -43,6 +44,7 @@ struct AVAudioRecorderHostObject {
 }
 impl HostObject for AVAudioRecorderHostObject {}
 
+#[derive(Default)]
 struct AVAudioPlayerHostObject {
     audio_file_url: id,
     output_callback: AudioQueueOutputCallback,

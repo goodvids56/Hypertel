@@ -24,6 +24,7 @@ use crate::objc::{
 };
 use crate::Environment;
 
+#[derive(Default)]
 struct ObjectEnumeratorHostObject {
     /// the enumerated collection, NSArray *
     array: id,

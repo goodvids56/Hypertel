@@ -32,6 +32,7 @@ const NSURLNetworkServiceTypeBackground: NSURLRequestNetworkServiceType = 3;
 #[allow(dead_code)]
 const NSURLNetworkServiceTypeVoice: NSURLRequestNetworkServiceType = 4;
 
+#[derive(Default)]
 struct NSURLRequestHostObject {
     /// `NSURL*`
     url: id,

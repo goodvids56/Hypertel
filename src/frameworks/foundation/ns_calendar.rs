@@ -181,6 +181,7 @@ fn gregorian_weekday_from_time_interval(time_interval: NSTimeInterval) -> NSInte
     ((2 + days_since_epoch - 1).rem_euclid(7) + 1) as NSInteger
 }
 
+#[derive(Default)]
 struct NSCalendarHostObject {
     calendar_identifier: id,
     first_weekday: NSInteger,

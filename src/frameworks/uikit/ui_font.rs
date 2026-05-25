@@ -44,8 +44,9 @@ impl State {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, Hash)]
 enum FontKind {
+    #[default]
     MonoRegular,
     MonoBold,
     MonoBoldItalic,
@@ -60,6 +61,7 @@ enum FontKind {
     SerifItalic,
 }
 
+#[derive(Default)]
 struct UIFontHostObject {
     size: CGFloat,
     kind: FontKind,

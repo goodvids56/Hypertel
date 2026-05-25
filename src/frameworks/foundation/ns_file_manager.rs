@@ -343,6 +343,7 @@ pub struct State {
     default_manager: Option<id>,
 }
 
+#[derive(Default)]
 struct NSDirectoryEnumeratorHostObject {
     iterator: std::vec::IntoIter<GuestPathBuf>,
     base_path: GuestPathBuf,

@@ -443,6 +443,21 @@ impl Dyld {
         writeln!(file, "    ]\n}}")
     }
 
+    /// Whether a Mach-O symbol name can be used as a C identifier after
+    /// stripping one leading underscore (how [Self::dump_host_symbols] names
+    /// things in generated stub sources).
+    fn symbol_is_valid_c_identifier(symbol: &str) -> bool {
+        let Some(name) = symbol.strip_prefix('_') else {
+            return false;
+        };
+        let mut chars = name.chars();
+        match chars.next() {
+            Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
+            _ => return false,
+        }
+        chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+    }
+
     /// Dumps all non-objc symbols provided by touchHLE.
     ///
     /// The dump format is Objective-C code (with meaningless types) that can be
@@ -463,19 +478,66 @@ impl Dyld {
                 writeln!(file, "@end")?;
             }
             for (constant_symbol, _) in dylib.constant_exports.iter().copied().flatten() {
-                writeln!(file, "int {};", constant_symbol.strip_prefix("_").unwrap())?;
+                write_host_constant_stub(file, constant_symbol)?;
             }
             for (function_symbol, _) in dylib.function_exports.iter().copied().flatten() {
-                writeln!(
-                    file,
-                    "void {}() {{}}",
-                    function_symbol.strip_prefix("_").unwrap()
-                )?;
+                write_host_function_stub(file, function_symbol)?;
             }
         }
         Ok(())
     }
+}
 
+/// Write a stub definition for a host constant export into integration-test
+/// stub sources. Some Mach-O symbols (e.g. `_OBJC_IVAR_$_NSObject.isa`) are not
+/// valid C identifiers, so those get assembler definitions instead.
+fn write_host_constant_stub(
+    file: &mut std::fs::File,
+    constant_symbol: &str,
+) -> Result<(), std::io::Error> {
+    use std::io::Write;
+    if Dyld::symbol_is_valid_c_identifier(constant_symbol) {
+        writeln!(
+            file,
+            "int {};",
+            constant_symbol.strip_prefix('_').unwrap()
+        )?;
+    } else {
+        // Absolute symbol with value 0 (sufficient for ivar offset symbols).
+        writeln!(
+            file,
+            "__asm__(\".globl {symbol}\\n.set {symbol}, 0\");",
+            symbol = constant_symbol
+        )?;
+    }
+    Ok(())
+}
+
+/// Write a stub definition for a host function export into integration-test
+/// stub sources.
+fn write_host_function_stub(
+    file: &mut std::fs::File,
+    function_symbol: &str,
+) -> Result<(), std::io::Error> {
+    use std::io::Write;
+    if Dyld::symbol_is_valid_c_identifier(function_symbol) {
+        writeln!(
+            file,
+            "void {}() {{}}",
+            function_symbol.strip_prefix('_').unwrap()
+        )?;
+    } else {
+        // Empty ARM stub: label at the Mach-O symbol name, then return.
+        writeln!(
+            file,
+            "__asm__(\".globl {symbol}\\n{symbol}:\\n\\tbx lr\");",
+            symbol = function_symbol
+        )?;
+    }
+    Ok(())
+}
+
+impl Dyld {
     /// [Self::do_initial_linking] but for when this is the app picker's special
     /// environment with no binary (see [crate::Environment::new_without_app]).
     pub fn do_initial_linking_with_no_bins(&mut self, mem: &mut Mem, objc: &mut ObjC) {

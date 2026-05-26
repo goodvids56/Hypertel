@@ -157,10 +157,13 @@ jobs:
         run: cargo build --target x86_64-apple-darwin --release
         env:
           CMAKE: ${{ github.workspace }}/vendor/cmake/bin/cmake
+      # Cross-compile TestApp.app only; skip running the CLI tests under touchHLE
+      # (the iOS job only needs the unsigned IPA artifact).
       - name: Build TestApp for iOS
         run: cargo test test_app --target x86_64-apple-darwin --release
         env:
           CMAKE: ${{ github.workspace }}/vendor/cmake/bin/cmake
+          TOUCHHLE_TESTAPP_BUILD_ONLY: "1"
       - name: Create unsigned TestApp IPA
         run: cd tests && ../dev-scripts/make-ipa.sh TestApp .
       - uses: actions/upload-artifact@main

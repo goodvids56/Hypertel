@@ -131,31 +131,24 @@ jobs:
       - if: ${{ steps.cache-cmake.outputs.cache-hit != 'true' }}
         name: Extract Cmake
         run: tar xzvf "cmake-3.31.6-macos-universal.tar.gz" -C vendor && mv "vendor/cmake-3.31.6-macos-universal/CMake.app/Contents/" vendor/cmake && rm -rf vendor/cmake-3.31.6-macos-universal
+      # LLVM 12.0.0 only published a macOS x86_64 prebuild (no arm64-apple-darwin).
+      # Apple Silicon runners run this Clang via Rosetta; Intel runners use it natively.
       - name: Try to get cached copy of LLVM
         id: cache-llvm
         uses: actions/cache@main
         with:
           path: tests/llvm
-          key: llvm_12_0_0_macOS_${{ runner.arch }}
+          key: llvm_12_0_0_macOS_x64
       - if: ${{ steps.cache-llvm.outputs.cache-hit != 'true' }}
         name: Download LLVM
         run: |
           set -eu
-          case "${{ runner.arch }}" in
-            ARM64)
-              LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.0/clang+llvm-12.0.0-arm64-apple-darwin.tar.xz"
-              ;;
-            X64)
-              LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.0/clang+llvm-12.0.0-x86_64-apple-darwin.tar.xz"
-              ;;
-            *)
-              echo "Unsupported macOS runner architecture: ${{ runner.arch }}" >&2
-              exit 1
-              ;;
-          esac
-          curl -L -O "$LLVM_URL"
+          LLVM_ARCHIVE="clang+llvm-12.0.0-x86_64-apple-darwin.tar.xz"
+          curl -fL -O "https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.0/${LLVM_ARCHIVE}"
           mkdir -p tests/llvm
-          tar -xf "$(basename "$LLVM_URL")" -C tests/llvm --strip-components=1
+          tar -xf "$LLVM_ARCHIVE"
+          mv clang+llvm-12.0.0-x86_64-apple-darwin/* tests/llvm/
+          rm -rf clang+llvm-12.0.0-x86_64-apple-darwin "$LLVM_ARCHIVE"
       - name: Get copy of common-3.0-sdk
         run: cd ${{ github.workspace }}/tests && curl -L https://github.com/touchHLE/common-3.0-sdk/releases/latest/download/common-3.0.sdk-macOS-universal.tar.gz | tar xzv
       - name: Install x86_64 toolchain

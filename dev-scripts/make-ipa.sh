@@ -25,8 +25,17 @@ fi
 
 rm -rf "$IPA_NAME" Payload/
 mkdir Payload
-ln -sf "${APP_NAME}.app" "Payload/${APP_NAME}.app"
+# Copy the bundle; do not symlink. zip(1) records symlinks as tiny
+# placeholder entries unless asked to dereference, which would produce an
+# installable IPA only a few hundred bytes in size.
+cp -R "${APP_NAME}.app" "Payload/"
 zip -r "$IPA_NAME" Payload/
 rm -rf Payload/
 
-echo "Created unsigned IPA: $(pwd)/$IPA_NAME"
+IPA_SIZE=$(wc -c < "$IPA_NAME" | tr -d ' ')
+if [ "$IPA_SIZE" -lt 100000 ]; then
+    echo "Error: ${IPA_NAME} is only ${IPA_SIZE} bytes; expected a full .app bundle inside Payload/." >&2
+    exit 1
+fi
+
+echo "Created unsigned IPA: $(pwd)/$IPA_NAME (${IPA_SIZE} bytes)"

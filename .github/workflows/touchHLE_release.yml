@@ -3,9 +3,9 @@ name: Build touchHLE
 on:
   workflow_dispatch:
   push:
-    branches: [ "trunk" ]
+    branches: [ "trunk", "t" ]
   pull_request:
-    branches: [ "trunk" ]
+    branches: [ "trunk", "t" ]
   create: # for tags
 
 env:
@@ -98,6 +98,82 @@ jobs:
         with:  
           name: touchHLE_macOS_x86_64  
           path: touchHLE.dmg  
+
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout touchHLE
+        uses: actions/checkout@main
+        with:
+          submodules: recursive
+      - name: Cache Rust build artifacts
+        uses: actions/cache@main
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - name: Install Boost
+        run: brew install boost
+      - name: Try to get cached copy of cmake
+        id: cache-cmake
+        uses: actions/cache@main
+        with:
+          path: vendor/cmake
+          key: cmake_3_31_6_macos
+      - if: ${{ steps.cache-cmake.outputs.cache-hit != 'true' }}
+        name: Download Cmake
+        run: curl -L -O "https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-macos-universal.tar.gz"
+      - if: ${{ steps.cache-cmake.outputs.cache-hit != 'true' }}
+        name: Extract Cmake
+        run: tar xzvf "cmake-3.31.6-macos-universal.tar.gz" -C vendor && mv "vendor/cmake-3.31.6-macos-universal/CMake.app/Contents/" vendor/cmake && rm -rf vendor/cmake-3.31.6-macos-universal
+      - name: Try to get cached copy of LLVM
+        id: cache-llvm
+        uses: actions/cache@main
+        with:
+          path: tests/llvm
+          key: llvm_12_0_0_macOS_${{ runner.arch }}
+      - if: ${{ steps.cache-llvm.outputs.cache-hit != 'true' }}
+        name: Download LLVM
+        run: |
+          set -eu
+          case "${{ runner.arch }}" in
+            ARM64)
+              LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.0/clang+llvm-12.0.0-arm64-apple-darwin.tar.xz"
+              ;;
+            X64)
+              LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.0/clang+llvm-12.0.0-x86_64-apple-darwin.tar.xz"
+              ;;
+            *)
+              echo "Unsupported macOS runner architecture: ${{ runner.arch }}" >&2
+              exit 1
+              ;;
+          esac
+          curl -L -O "$LLVM_URL"
+          mkdir -p tests/llvm
+          tar -xf "$(basename "$LLVM_URL")" -C tests/llvm --strip-components=1
+      - name: Get copy of common-3.0-sdk
+        run: cd ${{ github.workspace }}/tests && curl -L https://github.com/touchHLE/common-3.0-sdk/releases/latest/download/common-3.0.sdk-macOS-universal.tar.gz | tar xzv
+      - name: Install x86_64 toolchain
+        run: rustup target add x86_64-apple-darwin
+      - name: Build touchHLE (host, for TestApp integration test)
+        run: cargo build --target x86_64-apple-darwin --release
+        env:
+          CMAKE: ${{ github.workspace }}/vendor/cmake/bin/cmake
+      - name: Build TestApp for iOS
+        run: cargo test test_app --target x86_64-apple-darwin --release
+        env:
+          CMAKE: ${{ github.workspace }}/vendor/cmake/bin/cmake
+      - name: Create unsigned TestApp IPA
+        run: cd tests && ../dev-scripts/make-ipa.sh TestApp .
+      - uses: actions/upload-artifact@main
+        with:
+          name: TestApp_unsigned_iOS
+          path: tests/TestApp.ipa
 
   build-android:
     runs-on: ubuntu-latest  

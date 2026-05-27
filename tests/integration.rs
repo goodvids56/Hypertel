@@ -131,6 +131,7 @@ fn run_test_app(
     test_app_name: &str,
     extra_compile_args: &[&str],
     extra_run_args: &[&str],
+    build_only: bool,
 ) -> Result<(), Box<dyn Error>> {
     let test_app_path = tests_dir.join(format!("{}.app", test_app_name));
 
@@ -188,11 +189,18 @@ fn run_test_app(
         sources.iter().chain(cpp_objects.iter()),
         extra_compile_args,
     )?;
+    if build_only {
+        eprintln!(
+            "Built {} (skipping touchHLE run; TOUCHHLE_TESTAPP_BUILD_ONLY is set).",
+            test_app_path.display()
+        );
+        return Ok(());
+    }
     let binary_name = "touchHLE";
     let binary_path = target_dir().join(format!("{}{}", binary_name, env::consts::EXE_SUFFIX));
     let mut cmd = Command::new(binary_path);
     let output = cmd
-        .arg(test_app_path)
+        .arg(&test_app_path)
         // headless mode avoids a distracting window briefly appearing during
         // testing, and works in CI.
         .arg("--headless")
@@ -204,7 +212,13 @@ fn run_test_app(
         .expect("failed to execute touchHLE process");
     std::io::stdout().write_all(&output.stdout).unwrap();
     std::io::stderr().write_all(&output.stderr).unwrap();
-    assert!(output.status.success());
+    if !output.status.success() {
+        panic!(
+            "touchHLE exited with status {:?} when running {}",
+            output.status.code(),
+            test_app_path.display()
+        );
+    }
     // sanity check: check that emulation actually happened
     assert_ne!(
         find_subsequence(output.stderr.as_slice(), b"CPU emulation begins now."),
@@ -380,5 +394,12 @@ fn test_app() -> Result<(), Box<dyn Error>> {
     }
 
     // Finally, build TestApp itself.
-    run_test_app(&tests_dir, "TestApp", &extra_compile_args, &[])
+    let build_only = env::var("TOUCHHLE_TESTAPP_BUILD_ONLY").is_ok();
+    run_test_app(
+        &tests_dir,
+        "TestApp",
+        &extra_compile_args,
+        &[],
+        build_only,
+    )
 }

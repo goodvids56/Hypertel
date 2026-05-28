@@ -12,16 +12,29 @@ fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-for path in \
-    artifacts/macos/touchHLE.dmg \
-    artifacts/android/touchHLE.apk \
+# upload-artifact with path: touchHLE_windows_bundle/ places bundle contents at
+# the artifact root, not under touchHLE_windows_bundle/ after download.
+windows_exe=""
+for candidate in \
+    artifacts/windows/touchHLE.exe \
     artifacts/windows/touchHLE_windows_bundle/touchHLE.exe
 do
+    if [ -e "$candidate" ]; then
+        windows_exe="$candidate"
+        break
+    fi
+done
+
+for path in artifacts/macos/touchHLE.dmg artifacts/android/touchHLE.apk; do
     if [ ! -e "$path" ]; then
         echo "Missing build artifact (all platform builds must succeed): $path" >&2
         exit 1
     fi
 done
+if [ -z "$windows_exe" ]; then
+    echo "Missing build artifact (all platform builds must succeed): artifacts/windows/touchHLE.exe" >&2
+    exit 1
+fi
 
 if [ -z "$CHANGELOG_FROM" ]; then
     patch="${VERSION#v1.0.}"
@@ -66,7 +79,7 @@ prefix="Hypertel_${VERSION}"
 ./prepare-release.sh --create-zip-android "$ROOT/artifacts/android/touchHLE.apk" \
     -o "$ROOT/${prefix}_Android_AArch64.zip"
 ./prepare-release.sh --create-zip-windows \
-    "$ROOT/artifacts/windows/touchHLE_windows_bundle/touchHLE.exe" \
+    "$ROOT/$windows_exe" \
     -o "$ROOT/${prefix}_Windows_x86_64.zip"
 
 gh release create "$VERSION" \

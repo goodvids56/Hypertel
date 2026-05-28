@@ -309,7 +309,7 @@ jobs:
         uses: softprops/action-gh-release@master
         with:
           tag_name: ${{ needs.check-hypertel-release.outputs.version }}
-          name: Hypertel
+          name: Hypertel ${{ needs.check-hypertel-release.outputs.version }}
           body_path: release/RELEASE_NOTES.md
           files: |
             release/Hypertel_*.zip

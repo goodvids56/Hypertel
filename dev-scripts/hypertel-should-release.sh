@@ -36,7 +36,11 @@ else
 fi
 
 if [ "$should_release" = true ]; then
-    if [ -n "$latest_tag" ]; then
+    if [ "${FORCE_HYPERTEL_RELEASE:-}" = "true" ]; then
+        # Manual release: publish script uses git log -n 5 (see changelog_limit).
+        changelog_from=""
+        changelog_limit=5
+    elif [ -n "$latest_tag" ]; then
         changelog_from="$latest_tag"
     elif [ -n "${baseline:-}" ]; then
         changelog_from="$baseline"
@@ -45,6 +49,7 @@ if [ "$should_release" = true ]; then
     fi
 else
     changelog_from=""
+    changelog_limit=""
 fi
 
 if [ "${GITHUB_OUTPUT:-}" != "" ]; then
@@ -53,10 +58,12 @@ if [ "${GITHUB_OUTPUT:-}" != "" ]; then
         echo "version=${version}"
         echo "commits_since=${commits_since}"
         echo "changelog_from=${changelog_from}"
+        echo "changelog_limit=${changelog_limit:-}"
     } >>"$GITHUB_OUTPUT"
 else
     echo "should_release=${should_release}"
     echo "version=${version}"
     echo "commits_since=${commits_since}"
     echo "changelog_from=${changelog_from}"
+    echo "changelog_limit=${changelog_limit:-}"
 fi

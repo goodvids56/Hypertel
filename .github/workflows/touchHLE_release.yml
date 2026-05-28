@@ -251,6 +251,7 @@ jobs:
       should_release: ${{ steps.check.outputs.should_release }}
       version: ${{ steps.check.outputs.version }}
       changelog_from: ${{ steps.check.outputs.changelog_from }}
+      changelog_limit: ${{ steps.check.outputs.changelog_limit }}
     steps:
       - name: Checkout touchHLE
         uses: actions/checkout@main
@@ -299,6 +300,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
+          FORCE_HYPERTEL_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_hypertel_release && 'true' || '' }}
           VERSION: ${{ needs.check-hypertel-release.outputs.version }}
           CHANGELOG_FROM: ${{ needs.check-hypertel-release.outputs.changelog_from }}
+          CHANGELOG_LIMIT: ${{ needs.check-hypertel-release.outputs.changelog_limit }}
         run: ./dev-scripts/publish-hypertel-release.sh "$VERSION" "$CHANGELOG_FROM"

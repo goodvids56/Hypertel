@@ -236,3 +236,52 @@ jobs:
       with:  
         name: touchHLE_Windows_x86_64  
         path: touchHLE_windows_bundle/
+
+  check-hypertel-release:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/t'
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout touchHLE
+        uses: actions/checkout@main
+        with:
+          fetch-depth: 0
+      - name: Check whether a Hypertel release is due
+        id: check
+        run: ./dev-scripts/hypertel-should-release.sh
+
+  publish-hypertel-release:
+    needs: [check-hypertel-release, build-osx, build-android, build-win]
+    if: needs.check-hypertel-release.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout touchHLE
+        uses: actions/checkout@main
+        with:
+          submodules: recursive
+      - name: Download macOS artifact
+        uses: actions/download-artifact@main
+        with:
+          name: touchHLE_macOS_x86_64
+          path: artifacts/macos
+      - name: Download Android artifact
+        uses: actions/download-artifact@main
+        with:
+          name: touchHLE_Android_AArch64
+          path: artifacts/android
+      - name: Download Windows artifact
+        uses: actions/download-artifact@main
+        with:
+          name: touchHLE_Windows_x86_64
+          path: artifacts/windows
+      - name: Install packaging tools
+        run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq pandoc zip
+      - name: Create Hypertel GitHub release with build files
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.check-hypertel-release.outputs.version }}
+        run: ./dev-scripts/publish-hypertel-release.sh "$VERSION"

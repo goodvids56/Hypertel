@@ -2,6 +2,11 @@ name: Build touchHLE
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_hypertel_release:
+        description: Publish a Hypertel release (after all builds succeed)
+        type: boolean
+        default: false
   push:
     branches: [ "t" ]
   pull_request:
@@ -239,7 +244,9 @@ jobs:
 
   check-hypertel-release:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/t'
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/t') ||
+      github.event_name == 'workflow_dispatch'
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
       version: ${{ steps.check.outputs.version }}
@@ -251,6 +258,8 @@ jobs:
           fetch-depth: 0
       - name: Check whether a Hypertel release is due
         id: check
+        env:
+          FORCE_HYPERTEL_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_hypertel_release && 'true' || '' }}
         run: ./dev-scripts/hypertel-should-release.sh
 
   publish-hypertel-release:

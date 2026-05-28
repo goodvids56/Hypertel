@@ -25,7 +25,9 @@ fi
 
 version="v1.0.${next_patch}"
 
-if [ "$commits_since" -lt "$RELEASE_EVERY" ]; then
+if [ "${FORCE_HYPERTEL_RELEASE:-}" = "true" ]; then
+    should_release=true
+elif [ "$commits_since" -lt "$RELEASE_EVERY" ]; then
     should_release=false
 elif git rev-parse "refs/tags/${version}" >/dev/null 2>&1; then
     should_release=false

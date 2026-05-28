@@ -243,6 +243,7 @@ jobs:
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
       version: ${{ steps.check.outputs.version }}
+      changelog_from: ${{ steps.check.outputs.changelog_from }}
     steps:
       - name: Checkout touchHLE
         uses: actions/checkout@main
@@ -254,7 +255,12 @@ jobs:
 
   publish-hypertel-release:
     needs: [check-hypertel-release, build-osx, build-android, build-win]
-    if: needs.check-hypertel-release.outputs.should_release == 'true'
+    if: >-
+      needs.check-hypertel-release.result == 'success' &&
+      needs.check-hypertel-release.outputs.should_release == 'true' &&
+      needs.build-osx.result == 'success' &&
+      needs.build-android.result == 'success' &&
+      needs.build-win.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -283,5 +289,7 @@ jobs:
       - name: Create Hypertel GitHub release with build files
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
           VERSION: ${{ needs.check-hypertel-release.outputs.version }}
-        run: ./dev-scripts/publish-hypertel-release.sh "$VERSION"
+          CHANGELOG_FROM: ${{ needs.check-hypertel-release.outputs.changelog_from }}
+        run: ./dev-scripts/publish-hypertel-release.sh "$VERSION" "$CHANGELOG_FROM"

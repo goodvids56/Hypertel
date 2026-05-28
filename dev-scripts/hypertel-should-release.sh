@@ -33,14 +33,28 @@ else
     should_release=true
 fi
 
+if [ "$should_release" = true ]; then
+    if [ -n "$latest_tag" ]; then
+        changelog_from="$latest_tag"
+    elif [ -n "${baseline:-}" ]; then
+        changelog_from="$baseline"
+    else
+        changelog_from=""
+    fi
+else
+    changelog_from=""
+fi
+
 if [ "${GITHUB_OUTPUT:-}" != "" ]; then
     {
         echo "should_release=${should_release}"
         echo "version=${version}"
         echo "commits_since=${commits_since}"
+        echo "changelog_from=${changelog_from}"
     } >>"$GITHUB_OUTPUT"
 else
     echo "should_release=${should_release}"
     echo "version=${version}"
     echo "commits_since=${commits_since}"
+    echo "changelog_from=${changelog_from}"
 fi

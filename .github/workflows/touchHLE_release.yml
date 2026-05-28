@@ -279,6 +279,7 @@ jobs:
         uses: actions/checkout@main
         with:
           submodules: recursive
+          fetch-depth: 0
       - name: Download macOS artifact
         uses: actions/download-artifact@main
         with:
@@ -296,12 +297,20 @@ jobs:
           path: artifacts/windows
       - name: Install packaging tools
         run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq pandoc zip
-      - name: Create Hypertel GitHub release with build files
+      - name: Package Hypertel release files
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           FORCE_HYPERTEL_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_hypertel_release && 'true' || '' }}
           VERSION: ${{ needs.check-hypertel-release.outputs.version }}
           CHANGELOG_FROM: ${{ needs.check-hypertel-release.outputs.changelog_from }}
           CHANGELOG_LIMIT: ${{ needs.check-hypertel-release.outputs.changelog_limit }}
-        run: ./dev-scripts/publish-hypertel-release.sh "$VERSION" "$CHANGELOG_FROM"
+        run: ./dev-scripts/package-hypertel-release.sh "$VERSION" "$CHANGELOG_FROM"
+      - name: Publish Hypertel release
+        uses: softprops/action-gh-release@master
+        with:
+          tag_name: ${{ needs.check-hypertel-release.outputs.version }}
+          name: Hypertel
+          body_path: release/RELEASE_NOTES.md
+          files: |
+            release/Hypertel_*.zip
+          fail_on_unmatched_files: true

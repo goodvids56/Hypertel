@@ -1,5 +1,5 @@
 #!/bin/sh
-# Package Hypertel release zips from CI build artifacts and upload a GitHub release.
+# Package Hypertel release zips and write release notes for action-gh-release.
 set -eu
 
 VERSION="$1"
@@ -13,8 +13,6 @@ fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-# upload-artifact with path: touchHLE_windows_bundle/ places bundle contents at
-# the artifact root, not under touchHLE_windows_bundle/ after download.
 windows_exe=""
 for candidate in \
     artifacts/windows/touchHLE.exe \
@@ -46,8 +44,8 @@ if [ -z "$CHANGELOG_FROM" ]; then
     fi
 fi
 
-notes_file="$(mktemp)"
-trap 'rm -f "$notes_file"' EXIT INT TERM
+rm -rf release
+mkdir -p release
 
 {
     printf '%s\n\n' "Hypertel ${VERSION}"
@@ -84,7 +82,7 @@ trap 'rm -f "$notes_file"' EXIT INT TERM
     else
         printf '%s\n' "_No commit range available._"
     fi
-} >"$notes_file"
+} >release/RELEASE_NOTES.md
 
 cd "$ROOT/dev-scripts"
 ./prepare-release.sh --prepare-files
@@ -92,17 +90,9 @@ cd "$ROOT/dev-scripts"
 prefix="Hypertel_${VERSION}"
 
 ./prepare-release.sh --create-zip-macos "$ROOT/artifacts/macos/touchHLE.dmg" \
-    -o "$ROOT/${prefix}_macOS_x86_64.zip"
+    -o "$ROOT/release/${prefix}_macOS_x86_64.zip"
 ./prepare-release.sh --create-zip-android "$ROOT/artifacts/android/touchHLE.apk" \
-    -o "$ROOT/${prefix}_Android_AArch64.zip"
+    -o "$ROOT/release/${prefix}_Android_AArch64.zip"
 ./prepare-release.sh --create-zip-windows \
     "$ROOT/$windows_exe" \
-    -o "$ROOT/${prefix}_Windows_x86_64.zip"
-
-gh release create "$VERSION" \
-    --repo "$GITHUB_REPOSITORY" \
-    --title "Hypertel" \
-    --notes-file "$notes_file" \
-    "$ROOT/${prefix}_macOS_x86_64.zip" \
-    "$ROOT/${prefix}_Android_AArch64.zip" \
-    "$ROOT/${prefix}_Windows_x86_64.zip"
+    -o "$ROOT/release/${prefix}_Windows_x86_64.zip"

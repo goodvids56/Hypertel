@@ -314,10 +314,3 @@ jobs:
           files: |
             release/Hypertel_*.zip
           fail_on_unmatched_files: true
-      - name: Create Hypertel GitHub release with build files
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-          VERSION: ${{ needs.check-hypertel-release.outputs.version }}
-          CHANGELOG_FROM: ${{ needs.check-hypertel-release.outputs.changelog_from }}
-        run: ./dev-scripts/publish-hypertel-release.sh "$VERSION" "$CHANGELOG_FROM"

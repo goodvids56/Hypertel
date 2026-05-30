@@ -70,6 +70,7 @@ pub struct CFRunLoopSourceContext {
 }
 unsafe impl SafeRead for CFRunLoopSourceContext {}
 
+#[derive(Default)]
 pub struct CFRunLoopSourceHostObject {
     pub version: CFIndex,
     pub info: MutVoidPtr,

@@ -108,10 +108,32 @@ impl Bundle {
         }
     }
 
-    pub fn minimum_os_version(&self) -> Option<&str> {
-        self.plist
-            .get("MinimumOSVersion")
-            .map(|v| v.as_string().unwrap())
+    pub fn minimum_os_version(&self) -> Option<String> {
+        // `MinimumOSVersion` is documented as a string (e.g. "3.0"), but some
+        // bundles — particularly 64-bit App Store builds — encode it as a
+        // real number (3.0) or integer (3) in their binary Info.plist.
+        // `as_string().unwrap()` panicked on those, taking down the whole
+        // emulator. Accept any of those encodings and normalise to a string.
+        self.plist.get("MinimumOSVersion").and_then(|v| {
+            if let Some(s) = v.as_string() {
+                Some(s.to_string())
+            } else if let Some(i) = v.as_signed_integer() {
+                Some(i.to_string())
+            } else if let Some(u) = v.as_unsigned_integer() {
+                Some(u.to_string())
+            } else {
+                v.as_real().map(|r| {
+                    // Format e.g. 3.0 as "3", 6.1 as "6.1" — the consumer in
+                    // lib.rs parses major/minor numerically and tolerates a
+                    // missing minor component.
+                    if r.fract() == 0.0 {
+                        format!("{}", r as i64)
+                    } else {
+                        format!("{}", r)
+                    }
+                })
+            }
+        })
     }
 
     pub fn required_device_capabilities(&self) -> Vec<&str> {

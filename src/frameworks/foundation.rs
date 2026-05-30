@@ -18,7 +18,7 @@
 use crate::dyld::{export_c_func, ConstantExports, FunctionExports, HostConstant};
 use crate::frameworks::foundation::ns_string::CFStringGetCharactersPtr;
 use crate::mem::{ConstPtr, ConstVoidPtr, MutPtr};
-use crate::objc::id;
+use crate::objc::{id, msg_class, retain};
 use crate::Environment;
 
 pub mod _nib_archive_decoder;
@@ -47,6 +47,7 @@ pub mod ns_file_manager;
 pub mod ns_host;
 pub mod ns_http_cookie_storage;
 pub mod ns_index_path;
+pub mod ns_index_set;
 pub mod ns_json_serialization;
 pub mod ns_input_stream;
 pub mod ns_invocation;
@@ -381,6 +382,23 @@ fn matrix_identity_float4x4(env: &mut Environment) -> ConstVoidPtr {
     base.cast().cast_const()
 }
 
+/// `MKMapRectNull` — the "null" map rect from `<MapKit/MKGeometry.h>`.
+///
+/// `MKMapRect` is `{ MKMapPoint origin; MKMapSize size; }` where both
+/// `MKMapPoint` and `MKMapSize` are pairs of `double`, i.e. 32 bytes total.
+/// Apple defines `MKMapRectNull` as `(MKMapRect){ { INFINITY, INFINITY },
+/// { 0, 0 } }`, which `MKMapRectIsNull()` recognises by the infinite origin.
+fn mk_map_rect_null(env: &mut Environment) -> ConstVoidPtr {
+    let base: MutPtr<u8> = env.mem.alloc(32).cast();
+    env.mem.bytes_at_mut(base, 32).fill(0);
+    // origin.x and origin.y = INFINITY (f64) at byte offsets 0 and 8.
+    for &offset in &[0u32, 8] {
+        let p: MutPtr<f64> = MutPtr::from_bits(base.to_bits() + offset);
+        env.mem.write(p, f64::INFINITY);
+    }
+    base.cast().cast_const()
+}
+
 /// `UILayoutFittingCompressedSize` — `CGSize{0,0}` (8 bytes of zero) per
 /// Apple's `<UIKit/UIGeometry.h>`. This is the value AutoLayout uses
 /// when asking a view for its minimum size.
@@ -402,6 +420,44 @@ fn ui_layout_fitting_expanded_size(env: &mut Environment) -> ConstVoidPtr {
         env.mem.write(p, f32::MAX);
     }
     base.cast().cast_const()
+}
+
+/// `__NSArray0__` — the Apple Objective-C runtime's shared immutable empty
+/// `NSArray` singleton. Clang emits a reference to this symbol for an empty
+/// array literal `@[]`. We back it with a real, retained empty NSArray so
+/// guest code that messages it (e.g. `-count`, `-objectEnumerator`) behaves
+/// like a genuine empty array instead of crashing on a NULL isa.
+fn ns_array0(env: &mut Environment) -> ConstVoidPtr {
+    let arr: id = msg_class![env; NSArray array];
+    retain(env, arr);
+    arr.cast().cast_const()
+}
+
+/// `__NSDictionary0__` — the runtime's shared immutable empty `NSDictionary`
+/// singleton, referenced by an empty dictionary literal `@{}`. Backed by a
+/// real, retained empty NSDictionary for the same reason as `ns_array0`.
+fn ns_dictionary0(env: &mut Environment) -> ConstVoidPtr {
+    let dict: id = msg_class![env; NSDictionary dictionary];
+    retain(env, dict);
+    dict.cast().cast_const()
+}
+
+/// `AVCaptureExposureDurationCurrent` — a sentinel `CMTime` (24 bytes) meaning
+/// "leave the exposure duration unchanged". Apple defines it as
+/// `kCMTimeInvalid`, whose `flags` field has the `kCMTimeFlags_Valid` bit
+/// clear, so an all-zero struct is the correct representation.
+fn av_capture_exposure_duration_current(env: &mut Environment) -> ConstVoidPtr {
+    let ptr: MutPtr<u8> = env.mem.alloc(24).cast();
+    env.mem.bytes_at_mut(ptr, 24).fill(0);
+    ptr.cast().cast_const()
+}
+
+/// `AVCaptureISOCurrent` — a sentinel `float` (-1.0) meaning "leave the ISO
+/// unchanged", per `<AVFoundation/AVCaptureDevice.h>`.
+fn av_capture_iso_current(env: &mut Environment) -> ConstVoidPtr {
+    let ptr: MutPtr<f32> = env.mem.alloc(4).cast();
+    env.mem.write(ptr, -1.0f32);
+    ptr.cast().cast_const()
 }
 
 pub const STUB_CONSTANTS: ConstantExports = &[
@@ -1198,87 +1254,366 @@ pub const STUB_CONSTANTS: ConstantExports = &[
     // is exactly the constant name.
     // -----------------------------------------------------------------
     (
-        "AVPlayerItemTimeJumpedNotification",
+        "_AVPlayerItemTimeJumpedNotification",
         HostConstant::NSString("AVPlayerItemTimeJumpedNotification"),
     ),
     // -----------------------------------------------------------------
     // Photos framework constants.
     // -----------------------------------------------------------------
     (
-        "PHImageErrorKey",
+        "_PHImageErrorKey",
         HostConstant::NSString("PHImageErrorKey"),
     ),
     // -----------------------------------------------------------------
     // StoreKit framework constants.
     // -----------------------------------------------------------------
     (
-        "SKReceiptPropertyIsExpired",
+        "_SKReceiptPropertyIsExpired",
         HostConstant::NSString("SKReceiptPropertyIsExpired"),
     ),
     (
-        "SKReceiptPropertyIsRevoked",
+        "_SKReceiptPropertyIsRevoked",
         HostConstant::NSString("SKReceiptPropertyIsRevoked"),
     ),
     (
-        "SKReceiptPropertyIsVolumePurchase",
+        "_SKReceiptPropertyIsVolumePurchase",
         HostConstant::NSString("SKReceiptPropertyIsVolumePurchase"),
     ),
     (
-        "SKStoreProductParameterProductIdentifier",
+        "_SKStoreProductParameterProductIdentifier",
         HostConstant::NSString("SKStoreProductParameterProductIdentifier"),
     ),
     // -----------------------------------------------------------------
     // UIKit accessibility/input constants.
     // -----------------------------------------------------------------
     (
-        "UIAccessibilityScreenChangedNotification",
+        "_UIAccessibilityScreenChangedNotification",
         HostConstant::NSString("UIAccessibilityScreenChangedNotification"),
     ),
     (
-        "UITextInputCurrentInputModeDidChangeNotification",
+        "_UITextInputCurrentInputModeDidChangeNotification",
         HostConstant::NSString("UITextInputCurrentInputModeDidChangeNotification"),
     ),
     // -----------------------------------------------------------------
     // ImageIO constants.
     // -----------------------------------------------------------------
     (
-        "kCGImagePropertyExifDictionary",
+        "_kCGImagePropertyExifDictionary",
         HostConstant::NSString("{Exif}"),
     ),
     // -----------------------------------------------------------------
     // Security constants.
     // -----------------------------------------------------------------
     (
-        "kSecAttrIsPermanent",
+        "_kSecAttrIsPermanent",
         HostConstant::NSString("isper"),
     ),
     (
-        "kSecUseAuthenticationUI",
+        "_kSecUseAuthenticationUI",
         HostConstant::NSString("u_AuthUI"),
     ),
     (
-        "kSecUseAuthenticationUIFail",
+        "_kSecUseAuthenticationUIFail",
         HostConstant::NSString("u_AuthUIF"),
     ),
     // -----------------------------------------------------------------
     // CMTime constants.
     // -----------------------------------------------------------------
     (
-        "kCMTimeRangeZero",
+        "_kCMTimeRangeZero",
         HostConstant::Custom(kcm_timetime_range_zero),
     ),
     // -----------------------------------------------------------------
     // simd constants.
     // -----------------------------------------------------------------
     (
-        "matrix_identity_float4x4",
+        "_matrix_identity_float4x4",
         HostConstant::Custom(matrix_identity_float4x4),
+    ),
+    // -----------------------------------------------------------------
+    // UIKit hardware-keyboard input strings (<UIKit/UIKeyCommand.h>).
+    // Apps register UIKeyCommands against these; touchHLE does not deliver
+    // hardware-keyboard events, but the symbols must resolve to a stable
+    // non-nil NSString so the app's +keyCommands setup does not crash.
+    // -----------------------------------------------------------------
+    ("_UIKeyInputUpArrow", HostConstant::NSString("UIKeyInputUpArrow")),
+    (
+        "_UIKeyInputDownArrow",
+        HostConstant::NSString("UIKeyInputDownArrow"),
+    ),
+    (
+        "_UIKeyInputLeftArrow",
+        HostConstant::NSString("UIKeyInputLeftArrow"),
+    ),
+    (
+        "_UIKeyInputRightArrow",
+        HostConstant::NSString("UIKeyInputRightArrow"),
+    ),
+    ("_UIKeyInputEscape", HostConstant::NSString("UIKeyInputEscape")),
+    (
+        "_UIUserNotificationActionResponseTypedTextKey",
+        HostConstant::NSString("UIUserNotificationActionResponseTypedTextKey"),
+    ),
+    // -----------------------------------------------------------------
+    // CoreAnimation CATextLayer alignment modes (<QuartzCore/CATextLayer.h>).
+    // These are documented kCAAlignment* string values.
+    // -----------------------------------------------------------------
+    ("_kCAAlignmentLeft", HostConstant::NSString("left")),
+    ("_kCAAlignmentRight", HostConstant::NSString("right")),
+    ("_kCAAlignmentCenter", HostConstant::NSString("center")),
+    ("_kCAAlignmentJustified", HostConstant::NSString("justified")),
+    ("_kCAAlignmentNatural", HostConstant::NSString("natural")),
+    // -----------------------------------------------------------------
+    // AVFoundation time-pitch algorithm identifiers
+    // (<AVFoundation/AVAudioProcessingSettings.h>). Documented values.
+    // -----------------------------------------------------------------
+    (
+        "_AVAudioTimePitchAlgorithmTimeDomain",
+        HostConstant::NSString("TimeDomain"),
+    ),
+    (
+        "_AVAudioTimePitchAlgorithmVarispeed",
+        HostConstant::NSString("Varispeed"),
+    ),
+    (
+        "_AVAudioTimePitchAlgorithmSpectral",
+        HostConstant::NSString("Spectral"),
+    ),
+    (
+        "_AVAudioTimePitchAlgorithmLowQualityZeroLatency",
+        HostConstant::NSString("LowQualityZeroLatency"),
+    ),
+    (
+        "_AVCaptureDeviceTypeBuiltInWideAngleCamera",
+        HostConstant::NSString("AVCaptureDeviceTypeBuiltInWideAngleCamera"),
+    ),
+    // -----------------------------------------------------------------
+    // CoreMedia / CoreVideo / VideoToolbox format & pixel-buffer keys.
+    // -----------------------------------------------------------------
+    (
+        "_kCMFormatDescriptionExtension_Depth",
+        HostConstant::NSString("Depth"),
+    ),
+    (
+        "_kCVPixelBufferPoolMinimumBufferCountKey",
+        HostConstant::NSString("MinimumBufferCount"),
+    ),
+    (
+        "_kCVPixelBufferPoolMaximumBufferAgeKey",
+        HostConstant::NSString("MaximumBufferAge"),
+    ),
+    (
+        "_kCVPixelBufferPoolAllocationThresholdKey",
+        HostConstant::NSString("AllocationThreshold"),
+    ),
+    (
+        "_kVTDecompressionPropertyKey_PixelBufferPool",
+        HostConstant::NSString("PixelBufferPool"),
+    ),
+    (
+        "_kVTDecompressionPropertyKey_PixelBufferPoolIsShared",
+        HostConstant::NSString("PixelBufferPoolIsShared"),
+    ),
+    (
+        "_kVTDecompressionPropertyKey_OutputPoolRequestedMinimumBufferCount",
+        HostConstant::NSString("OutputPoolRequestedMinimumBufferCount"),
+    ),
+    // -----------------------------------------------------------------
+    // CoreText font attribute key (<CoreText/CTFont.h>).
+    // -----------------------------------------------------------------
+    (
+        "_kCTFontPostScriptNameKey",
+        HostConstant::NSString("NSCTFontPostScriptNameAttribute"),
+    ),
+    // -----------------------------------------------------------------
+    // CoreGraphics PDF context info keys (<CoreGraphics/CGPDFContext.h>).
+    // -----------------------------------------------------------------
+    ("_kCGPDFContextTitle", HostConstant::NSString("Title")),
+    ("_kCGPDFContextCreator", HostConstant::NSString("Creator")),
+    // -----------------------------------------------------------------
+    // GameKit error domain (<GameKit/GKSession.h>).
+    // -----------------------------------------------------------------
+    (
+        "_GKSessionErrorDomain",
+        HostConstant::NSString("com.apple.gamekit.GKSessionErrorDomain"),
+    ),
+    // -----------------------------------------------------------------
+    // PassKit payment network identifiers (<PassKit/PKPaymentRequest.h>).
+    // Documented values.
+    // -----------------------------------------------------------------
+    ("_PKPaymentNetworkVisa", HostConstant::NSString("Visa")),
+    (
+        "_PKPaymentNetworkMasterCard",
+        HostConstant::NSString("MasterCard"),
+    ),
+    ("_PKPaymentNetworkAmex", HostConstant::NSString("Amex")),
+    ("_PKPaymentNetworkDiscover", HostConstant::NSString("Discover")),
+    // -----------------------------------------------------------------
+    // MapKit launch-options keys (<MapKit/MKTypes.h>).
+    // -----------------------------------------------------------------
+    (
+        "_MKLaunchOptionsDirectionsModeKey",
+        HostConstant::NSString("MKLaunchOptionsDirectionsModeKey"),
+    ),
+    (
+        "_MKLaunchOptionsDirectionsModeDriving",
+        HostConstant::NSString("Driving"),
+    ),
+    ("_MKMapRectNull", HostConstant::Custom(mk_map_rect_null)),
+    // -----------------------------------------------------------------
+    // UIKit activity type (<UIKit/UIActivity.h>). Documented value.
+    // -----------------------------------------------------------------
+    (
+        "_UIActivityTypePostToTencentWeibo",
+        HostConstant::NSString("com.apple.UIKit.activity.PostToTencentWeibo"),
+    ),
+    // -----------------------------------------------------------------
+    // Notification names referenced by apps but never posted by touchHLE.
+    // Registering them as stable NSStrings avoids a NULL relocation crash
+    // when the app subscribes via NSNotificationCenter.
+    // -----------------------------------------------------------------
+    (
+        "_NSCurrentLocaleDidChangeNotification",
+        HostConstant::NSString("NSCurrentLocaleDidChangeNotification"),
+    ),
+    (
+        "_NSExtensionHostDidBecomeActiveNotification",
+        HostConstant::NSString("NSExtensionHostDidBecomeActiveNotification"),
+    ),
+    (
+        "_NSExtensionHostDidEnterBackgroundNotification",
+        HostConstant::NSString("NSExtensionHostDidEnterBackgroundNotification"),
+    ),
+    (
+        "_NSExtensionHostWillEnterForegroundNotification",
+        HostConstant::NSString("NSExtensionHostWillEnterForegroundNotification"),
+    ),
+    (
+        "_NSExtensionHostWillResignActiveNotification",
+        HostConstant::NSString("NSExtensionHostWillResignActiveNotification"),
+    ),
+    (
+        "_UIScreenCapturedDidChangeNotification",
+        HostConstant::NSString("UIScreenCapturedDidChangeNotification"),
+    ),
+    (
+        "_UISceneWillConnectNotification",
+        HostConstant::NSString("UISceneWillConnectNotification"),
+    ),
+    (
+        "_UISceneDidDisconnectNotification",
+        HostConstant::NSString("UISceneDidDisconnectNotification"),
+    ),
+    // -----------------------------------------------------------------
+    // NSMetadata / iCloud ubiquitous-item keys referenced by apps that
+    // probe for iCloud document state.
+    // -----------------------------------------------------------------
+    (
+        "_NSMetadataItemPathKey",
+        HostConstant::NSString("kMDItemPath"),
+    ),
+    (
+        "_NSMetadataUbiquitousItemDownloadingStatusKey",
+        HostConstant::NSString("NSMetadataUbiquitousItemDownloadingStatusKey"),
+    ),
+    (
+        "_NSURLUbiquitousItemDownloadingStatusKey",
+        HostConstant::NSString("NSURLUbiquitousItemDownloadingStatusKey"),
+    ),
+    (
+        "_NSURLUbiquitousItemDownloadingStatusCurrent",
+        HostConstant::NSString("NSURLUbiquitousItemDownloadingStatusCurrent"),
+    ),
+    // -----------------------------------------------------------------
+    // Empty immutable collection singletons. The Objective-C runtime and
+    // some apps reference `__NSArray0__` / `__NSDictionary0__` directly via
+    // relocations (e.g. for `@[]` / `@{}` literals); they must resolve to a
+    // real, retained, empty NSArray/NSDictionary object.
+    // -----------------------------------------------------------------
+    ("___NSArray0__", HostConstant::Custom(ns_array0)),
+    ("___NSDictionary0__", HostConstant::Custom(ns_dictionary0)),
+    // -----------------------------------------------------------------
+    // MediaPlayer now-playing-info dictionary keys
+    // (<MediaPlayer/MPNowPlayingInfoCenter.h>). Documented values.
+    // -----------------------------------------------------------------
+    (
+        "_MPNowPlayingInfoPropertyElapsedPlaybackTime",
+        HostConstant::NSString("MPNowPlayingInfoPropertyElapsedPlaybackTime"),
+    ),
+    (
+        "_MPNowPlayingInfoPropertyPlaybackRate",
+        HostConstant::NSString("MPNowPlayingInfoPropertyPlaybackRate"),
+    ),
+    // -----------------------------------------------------------------
+    // AVFoundation metadata key spaces / common keys
+    // (<AVFoundation/AVMetadataIdentifiers.h>). Documented values.
+    // -----------------------------------------------------------------
+    ("_AVMetadataKeySpaceCommon", HostConstant::NSString("comn")),
+    ("_AVMetadataCommonKeyTitle", HostConstant::NSString("title")),
+    // -----------------------------------------------------------------
+    // CoreGraphics extended-range color space names
+    // (<CoreGraphics/CGColorSpace.h>).
+    // -----------------------------------------------------------------
+    (
+        "_kCGColorSpaceExtendedSRGB",
+        HostConstant::NSString("kCGColorSpaceExtendedSRGB"),
+    ),
+    (
+        "_kCGColorSpaceExtendedLinearSRGB",
+        HostConstant::NSString("kCGColorSpaceExtendedLinearSRGB"),
+    ),
+    // -----------------------------------------------------------------
+    // AVCaptureDevice "current value" sentinels
+    // (<AVFoundation/AVCaptureDevice.h>).
+    // -----------------------------------------------------------------
+    (
+        "_AVCaptureExposureDurationCurrent",
+        HostConstant::Custom(av_capture_exposure_duration_current),
+    ),
+    (
+        "_AVCaptureISOCurrent",
+        HostConstant::Custom(av_capture_iso_current),
+    ),
+    // -----------------------------------------------------------------
+    // CoreAnimation CAEmitterLayer emitter shapes & render modes
+    // (<QuartzCore/CAEmitterLayer.h>). Documented string values.
+    // -----------------------------------------------------------------
+    ("_kCAEmitterLayerPoint", HostConstant::NSString("point")),
+    ("_kCAEmitterLayerLine", HostConstant::NSString("line")),
+    ("_kCAEmitterLayerRectangle", HostConstant::NSString("rectangle")),
+    ("_kCAEmitterLayerCuboid", HostConstant::NSString("cuboid")),
+    ("_kCAEmitterLayerCircle", HostConstant::NSString("circle")),
+    ("_kCAEmitterLayerSphere", HostConstant::NSString("sphere")),
+    ("_kCAEmitterLayerSurface", HostConstant::NSString("surface")),
+    ("_kCAEmitterLayerUnordered", HostConstant::NSString("unordered")),
+    (
+        "_kCAEmitterLayerOldestFirst",
+        HostConstant::NSString("oldestFirst"),
+    ),
+    ("_kCAEmitterLayerOldestLast", HostConstant::NSString("oldestLast")),
+    (
+        "_kCAEmitterLayerBackToFront",
+        HostConstant::NSString("backToFront"),
+    ),
+    ("_kCAEmitterLayerAdditive", HostConstant::NSString("additive")),
+    // -----------------------------------------------------------------
+    // UIKit table-view section-index search magic string
+    // (<UIKit/UITableView.h>). Documented value is "{search}".
+    // -----------------------------------------------------------------
+    ("_UITableViewIndexSearch", HostConstant::NSString("{search}")),
+    // -----------------------------------------------------------------
+    // AVFoundation audio-encoder setting key
+    // (<AVFoundation/AVAudioSettings.h>).
+    // -----------------------------------------------------------------
+    (
+        "_AVEncoderBitRatePerChannelKey",
+        HostConstant::NSString("AVEncoderBitRatePerChannelKey"),
     ),
     // -----------------------------------------------------------------
     // sqlite3 constants.
     // -----------------------------------------------------------------
     (
-        "sqlite3_temp_directory",
+        "_sqlite3_temp_directory",
         HostConstant::NullPtr,
     ),
 ];
@@ -1312,6 +1647,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         ns_file_manager::CLASSES,
         ns_host::CLASSES,
         ns_index_path::CLASSES,
+        ns_index_set::CLASSES,
         ns_json_serialization::CLASSES,
         ns_input_stream::CLASSES,
         ns_invocation::CLASSES,

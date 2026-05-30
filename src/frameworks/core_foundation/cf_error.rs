@@ -17,7 +17,9 @@
 //! the documented domain identifier so that comparisons made with
 //! `CFEqual` / `-[NSString isEqualToString:]` succeed.
 
-use crate::dyld::{ConstantExports, HostConstant};
+use crate::dyld::{export_c_func, ConstantExports, FunctionExports, HostConstant};
+use crate::objc::{id, msg, nil, retain};
+use crate::Environment;
 
 pub const CONSTANTS: ConstantExports = &[
     // <https://developer.apple.com/documentation/corefoundation/kcferrordomainposix>
@@ -73,3 +75,21 @@ pub const CONSTANTS: ConstantExports = &[
     // <https://developer.apple.com/documentation/corefoundation/kcferrorfilepathkey>
     ("_kCFErrorFilePathKey", HostConstant::NSString("NSFilePath")),
 ];
+
+/// `CFStringRef CFErrorCopyDescription(CFErrorRef err)`
+///
+/// Returns a human-readable description of the error. Because `CFError` is
+/// toll-free bridged with `NSError`, this forwards to `-localizedDescription`.
+/// The `Copy` naming means the caller owns the returned string (+1), so we
+/// retain it.
+///
+/// Reference: <https://developer.apple.com/documentation/corefoundation/1494756-cferrorcopydescription>
+fn CFErrorCopyDescription(env: &mut Environment, err: id /* CFErrorRef */) -> id /* CFStringRef */ {
+    if err.is_null() {
+        return nil;
+    }
+    let desc: id = msg![env; err localizedDescription];
+    retain(env, desc)
+}
+
+pub const FUNCTIONS: FunctionExports = &[export_c_func!(CFErrorCopyDescription(_))];

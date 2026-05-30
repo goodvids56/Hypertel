@@ -68,6 +68,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         cf_allocator::FUNCTIONS,
         cf_array::FUNCTIONS,
         cf_dictionary::FUNCTIONS,
+        cf_error::FUNCTIONS,
         cf_bundle::FUNCTIONS,
         cf_socket::FUNCTIONS,
         cf_data::FUNCTIONS,

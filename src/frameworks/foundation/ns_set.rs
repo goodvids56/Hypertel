@@ -11,7 +11,7 @@ use super::ns_enumerator::{fast_enumeration_helper, NSFastEnumerationState};
 use super::NSUInteger;
 use crate::abi::DotDotDot;
 use crate::environment::Environment;
-use crate::mem::MutPtr;
+use crate::mem::{ConstPtr, MutPtr};
 use crate::objc::{
     autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
     NSZonePtr,
@@ -99,6 +99,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
+// Apple: "Creates and returns a set containing a specified number of objects
+// from a given C array of objects."
+// https://developer.apple.com/documentation/foundation/nsset/1574811-setwithobjects
++ (id)setWithObjects:(ConstPtr<id>)objects count:(NSUInteger)count {
+    let new: id = msg_class![env; _touchHLE_NSSet alloc];
+    let new: id = msg![env; new initWithObjects:objects count:count];
+    autorelease(env, new)
+}
+
 // NSCopying implementation
 - (id)copyWithZone:(NSZonePtr)_zone {
     retain(env, this)
@@ -170,6 +179,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
++ (id)setWithObjects:(ConstPtr<id>)objects count:(NSUInteger)count {
+    let new: id = msg_class![env; _touchHLE_NSMutableSet alloc];
+    let new: id = msg![env; new initWithObjects:objects count:count];
+    autorelease(env, new)
+}
+
 // NSCopying implementation
 // NSMutableSet's -copyWithZone: must produce an immutable NSSet that
 // snapshots the receiver. We materialise the elements via -allObjects
@@ -206,6 +221,12 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithObjects:(id)first_obj, ...args {
     env.objc.borrow_mut::<SetHostObject>(this).dict = set_from_objects(env, first_obj, args);
+    this
+}
+
+- (id)initWithObjects:(ConstPtr<id>)objects count:(NSUInteger)count {
+    env.objc.borrow_mut::<SetHostObject>(this).dict =
+        set_from_c_array(env, objects, count);
     this
 }
 
@@ -254,6 +275,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)allObjects {
     let objects = env.objc.borrow_mut::<SetHostObject>(this).dict.iter_keys().collect();
     ns_array::from_vec(env, objects)
+}
+
+// Apple: "Returns the object in the set that is equal to a given object, or
+// nil if no such object exists."
+// https://developer.apple.com/documentation/foundation/nsset/1414703-member
+- (id)member:(id)object {
+    set_member(env, this, object)
 }
 
 - (id)objectEnumerator { // NSEnumerator*
@@ -324,6 +352,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
+- (id)initWithObjects:(ConstPtr<id>)objects count:(NSUInteger)count {
+    env.objc.borrow_mut::<SetHostObject>(this).dict =
+        set_from_c_array(env, objects, count);
+    this
+}
+
 - (id)initWithArray:(id)array { // NSArray*
     env.objc.borrow_mut::<SetHostObject>(this).dict = set_from_array(env, array);
     this
@@ -376,6 +410,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)allObjects {
     let objects = env.objc.borrow_mut::<SetHostObject>(this).dict.iter_keys().collect();
     ns_array::from_vec(env, objects)
+}
+
+- (id)member:(id)object {
+    set_member(env, this, object)
 }
 
 - (id)objectEnumerator { // NSEnumerator*
@@ -573,4 +611,47 @@ fn set_from_set(env: &mut Environment, other: id, copy_items: bool) -> Dictionar
         }
     }
     dict
+}
+
+/// Build a [DictionaryHostObject] from a C array of `count` object pointers,
+/// shared between `-initWithObjects:count:` and `+setWithObjects:count:`.
+/// Mirrors Apple's documented `+[NSSet setWithObjects:count:]`.
+fn set_from_c_array(
+    env: &mut Environment,
+    objects: ConstPtr<id>,
+    count: NSUInteger,
+) -> DictionaryHostObject {
+    let null: id = msg_class![env; NSNull null];
+    let mut dict = <DictionaryHostObject as Default>::default();
+    for i in 0..count {
+        let object: id = env.mem.read(objects + i);
+        dict.insert(env, object, null, /* copy_key: */ false);
+    }
+    dict
+}
+
+/// Shared implementation of `-[NSSet member:]` for both private subclasses.
+/// Returns the stored object equal (by pointer identity or `-isEqual:`) to
+/// `object`, or `nil` if there is none. Apple documents `member:` as the
+/// canonical equality lookup for set membership.
+fn set_member(env: &mut Environment, this: id, object: id) -> id {
+    if object == nil {
+        return nil;
+    }
+    let keys: Vec<id> = env
+        .objc
+        .borrow_mut::<SetHostObject>(this)
+        .dict
+        .iter_keys()
+        .collect();
+    for key in keys {
+        if key == object {
+            return key;
+        }
+        let eq: bool = msg![env; key isEqual:object];
+        if eq {
+            return key;
+        }
+    }
+    nil
 }

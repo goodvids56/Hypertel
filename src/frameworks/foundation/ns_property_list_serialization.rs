@@ -5,7 +5,7 @@
  */
 //! `NSPropertyListSerialization`.
 
-use super::{ns_array, ns_data, ns_dictionary, ns_string, NSUInteger};
+use super::{ns_array, ns_data, ns_dictionary, ns_string, NSInteger, NSUInteger};
 use super::{
     ns_array::ArrayHostObject, ns_data::NSDataHostObject, ns_dictionary::DictionaryHostObject,
     ns_value::NSNumberHostObject,
@@ -31,6 +31,11 @@ pub const NSPropertyListMutableContainersAndLeaves: NSPropertyListMutabilityOpti
 pub type NSPropertyListFormat = NSUInteger;
 pub const NSPropertyListXMLFormat_v1_0: NSPropertyListFormat = 100;
 pub const NSPropertyListBinaryFormat_v1_0: NSPropertyListFormat = 200;
+
+/// Options for reading a property list. The numeric values are identical to
+/// the legacy `NSPropertyListMutabilityOptions`, which is why Apple lets the
+/// two be used interchangeably.
+pub type NSPropertyListReadOptions = NSUInteger;
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -88,9 +93,93 @@ pub const CLASSES: ClassExports = objc_classes! {
     nil
 }
 
+// `+ (id)propertyListWithData:(NSData *)data
+//             options:(NSPropertyListReadOptions)opt
+//              format:(NSPropertyListFormat *)format
+//               error:(NSError **)error;`
+//
+// Modern replacement (available since iOS 4.0 / macOS 10.6) for the
+// deprecated `propertyListFromData:mutabilityOption:format:errorDescription:`.
+// Per Apple's Foundation documentation
+// (<https://developer.apple.com/documentation/foundation/nspropertylistserialization/1409678-propertylist>):
+// `opt` selects container/leaf mutability (same numeric values as the legacy
+// mutability options), `format` (which may be NULL) receives the detected
+// on-disk format, `error` (which may be NULL) receives an `NSError` describing
+// any failure, and the method returns the decoded, autoreleased property-list
+// object — or `nil` when the data cannot be parsed.
++ (id)propertyListWithData:(id)data // NSData *
+                   options:(NSPropertyListReadOptions)opt
+                    format:(MutPtr<NSPropertyListFormat>)format
+                     error:(MutPtr<id>)error { // NSError **
+    if data == nil {
+        if !error.is_null() {
+            let err = make_plist_read_error(env, "Data parameter is nil");
+            env.mem.write(error, err);
+        }
+        return nil;
+    }
+
+    let slice = ns_data::to_rust_slice(env, data);
+
+    // Apple's parser auto-detects the format. Try XML first, then binary,
+    // matching the legacy code path above.
+    let parsed = Value::from_reader_xml(Cursor::new(slice))
+        .map(|root| (root, NSPropertyListXMLFormat_v1_0))
+        .or_else(|_| {
+            Value::from_reader(Cursor::new(slice))
+                .map(|root| (root, NSPropertyListBinaryFormat_v1_0))
+        });
+
+    match parsed {
+        Ok((root, detected_format)) => {
+            // A well-formed property list's root object is always a container
+            // (dictionary or array). Anything else is treated as corrupt.
+            if root.as_array().is_none() && root.as_dictionary().is_none() {
+                if !error.is_null() {
+                    let err = make_plist_read_error(
+                        env,
+                        "Property list root is neither a dictionary nor an array",
+                    );
+                    env.mem.write(error, err);
+                }
+                return nil;
+            }
+            if !format.is_null() {
+                env.mem.write(format, detected_format);
+            }
+            if !error.is_null() {
+                env.mem.write(error, nil);
+            }
+            let property_list = deserialize_plist(env, &root, opt);
+            autorelease(env, property_list)
+        }
+        Err(_) => {
+            if !error.is_null() {
+                let err = make_plist_read_error(env, "Failed to parse property list data");
+                env.mem.write(error, err);
+            }
+            nil
+        }
+    }
+}
+
 @end
 
 };
+
+/// Build an autoreleased `NSError` in the Cocoa error domain describing a
+/// property-list read failure. The code `3840` is
+/// `NSPropertyListReadCorruptError`, the value Foundation reports when the
+/// supplied data is not a valid property list. Returned by
+/// `+propertyListWithData:options:format:error:` on failure.
+fn make_plist_read_error(env: &mut Environment, message: &str) -> id {
+    log_dbg!("NSPropertyListSerialization read error: {}", message);
+    let domain = ns_string::from_rust_string(env, String::from("NSCocoaErrorDomain"));
+    let code: NSInteger = 3840; // NSPropertyListReadCorruptError
+    let err: id = msg_class![env; NSError errorWithDomain:domain code:code userInfo:nil];
+    release(env, domain);
+    err
+}
 
 /// Internals of `initWithContentsOfFile:` on `NSArray` and `NSDictionary`.
 /// Returns `nil` on failure.

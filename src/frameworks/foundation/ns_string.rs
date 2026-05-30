@@ -1625,7 +1625,12 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())appendFormat:(id)format, ...args {
-    assert_ne!(format, nil);
+    // Apple raises NSInvalidArgumentException when `format` is nil; mirror the
+    // lenient behaviour used elsewhere and no-op to keep the guest alive.
+    if format == nil {
+        log!("Warning: [NSMutableString appendFormat:nil] called. This would throw NSInvalidArgumentException on iOS. Ignoring.");
+        return;
+    }
     let formatted = with_format(env, format, args.start());
     let ns = from_rust_string(env, formatted);
     () = msg![env; this appendString:ns];
@@ -2205,7 +2210,12 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())appendFormat:(id)format, ...args {
-    assert_ne!(format, nil);
+    // Apple raises NSInvalidArgumentException when `format` is nil; mirror the
+    // lenient behaviour used elsewhere and no-op to keep the guest alive.
+    if format == nil {
+        log!("Warning: [NSMutableString appendFormat:nil] called. This would throw NSInvalidArgumentException on iOS. Ignoring.");
+        return;
+    }
     let formatted = with_format(env, format, args.start());
     let ns = from_rust_string(env, formatted);
     () = msg![env; this appendString:ns];
@@ -2213,7 +2223,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())setString:(id)a_string {
-    assert_ne!(a_string, nil);
+    // Apple raises NSInvalidArgumentException when `a_string` is nil; the real
+    // runtime never aborts the process, so log and ignore instead of asserting
+    // (this previously crashed e.g. Reckless Getaway with `left != right`).
+    if a_string == nil {
+        log!("Warning: [NSMutableString setString:nil] called. This would throw NSInvalidArgumentException on iOS. Ignoring.");
+        return;
+    }
     let str = to_rust_string(env, a_string);
     let host_object = StringHostObject::Utf8(str);
     *env.objc.borrow_mut(this) = host_object;

@@ -233,7 +233,7 @@ pub fn main<T: Iterator<Item = String>>(mut args: T) -> Result<(), String> {
     }
     echo!(
         "- Minimum OS version: {}",
-        minimum_os_version.unwrap_or("(not specified)")
+        minimum_os_version.as_deref().unwrap_or("(not specified)")
     );
     echo!(
         "- Required device capabilities: {}",
@@ -257,7 +257,7 @@ pub fn main<T: Iterator<Item = String>>(mut args: T) -> Result<(), String> {
     );
     echo!();
 
-    if let Some(version) = minimum_os_version {
+    if let Some(version) = minimum_os_version.as_deref() {
         // Apple's `MinimumOSVersion` Info.plist key follows the standard
         // dotted version format (`MAJOR[.MINOR[.PATCH]]`). Some apps ship
         // with just `"7"`, others with `"7.0"`, others with `"7.0.0"` or

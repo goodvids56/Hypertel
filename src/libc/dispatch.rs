@@ -101,6 +101,15 @@ pub struct State {
     named_queues: HashMap<String, u32>,
     /// Next queue handle to hand out.
     next_queue_handle: u32,
+    /// Queue-specific values set via `dispatch_queue_set_specific`, keyed by
+    /// `(queue handle bits, key pointer bits)` and storing the context
+    /// pointer bits. See
+    /// <https://developer.apple.com/documentation/dispatch/1452828-dispatch_queue_set_specific>.
+    queue_specifics: HashMap<(u32, u32), u32>,
+    /// Stack of queue handles currently executing a block, so that
+    /// `dispatch_get_specific` can resolve against the running queue. The
+    /// main queue is assumed when the stack is empty.
+    current_queue_stack: Vec<u32>,
 }
 
 fn get_state(env: &mut Environment) -> &mut State {
@@ -250,17 +259,21 @@ fn dispatch_release(_env: &mut Environment, _obj: MutVoidPtr) {
 
 // MARK: - Dispatch async / sync
 
-fn dispatch_async(env: &mut Environment, _queue: dispatch_queue_t, block: dispatch_block_t) {
+fn dispatch_async(env: &mut Environment, queue: dispatch_queue_t, block: dispatch_block_t) {
     log_dbg!("dispatch_async: calling block immediately (single-threaded)");
     if !block.is_null() {
+        get_state(env).current_queue_stack.push(queue.to_bits());
         call_void_block(env, block);
+        get_state(env).current_queue_stack.pop();
     }
 }
 
-fn dispatch_sync(env: &mut Environment, _queue: dispatch_queue_t, block: dispatch_block_t) {
+fn dispatch_sync(env: &mut Environment, queue: dispatch_queue_t, block: dispatch_block_t) {
     log_dbg!("dispatch_sync: calling block immediately");
     if !block.is_null() {
+        get_state(env).current_queue_stack.push(queue.to_bits());
         call_void_block(env, block);
+        get_state(env).current_queue_stack.pop();
     }
 }
 
@@ -569,6 +582,69 @@ fn dispatch_get_context(_env: &mut Environment, _object: MutVoidPtr) -> MutVoidP
     MutVoidPtr::null()
 }
 
+/// `void dispatch_queue_set_specific(dispatch_queue_t queue, const void *key,
+///                                   void *context,
+///                                   dispatch_function_t destructor)`
+///
+/// Associates `context` with `queue` under the unique pointer `key`. Passing
+/// a NULL `context` clears any existing association (Apple documents NULL as
+/// "remove the value"). The `destructor` is the cleanup callback GCD would run
+/// when the value is replaced or the queue is destroyed; touchHLE does not own
+/// the guest's context allocation, so it is intentionally not invoked.
+/// <https://developer.apple.com/documentation/dispatch/1452828-dispatch_queue_set_specific>
+fn dispatch_queue_set_specific(
+    env: &mut Environment,
+    queue: dispatch_queue_t,
+    key: ConstVoidPtr,
+    context: MutVoidPtr,
+    _destructor: GuestFunction,
+) {
+    let qk = (queue.to_bits(), key.to_bits());
+    let state = get_state(env);
+    if context.is_null() {
+        state.queue_specifics.remove(&qk);
+    } else {
+        state.queue_specifics.insert(qk, context.to_bits());
+    }
+}
+
+/// `void *dispatch_queue_get_specific(dispatch_queue_t queue, const void *key)`
+///
+/// Returns the value previously associated with `key` on `queue`, or NULL.
+/// <https://developer.apple.com/documentation/dispatch/1453028-dispatch_queue_get_specific>
+fn dispatch_queue_get_specific(
+    env: &mut Environment,
+    queue: dispatch_queue_t,
+    key: ConstVoidPtr,
+) -> MutVoidPtr {
+    let qk = (queue.to_bits(), key.to_bits());
+    match get_state(env).queue_specifics.get(&qk) {
+        Some(&bits) => MutVoidPtr::from_bits(bits),
+        None => MutVoidPtr::null(),
+    }
+}
+
+/// `void *dispatch_get_specific(const void *key)`
+///
+/// Returns the value associated with `key` on the queue currently executing
+/// the caller. We track the running queue via `current_queue_stack`
+/// (pushed/popped around `dispatch_sync`/`dispatch_async` block execution);
+/// when nothing is running we resolve against the main queue, matching the
+/// behaviour callers rely on for "am I on queue X?" re-entrancy checks.
+/// <https://developer.apple.com/documentation/dispatch/1453099-dispatch_get_specific>
+fn dispatch_get_specific(env: &mut Environment, key: ConstVoidPtr) -> MutVoidPtr {
+    let state = get_state(env);
+    let current = state
+        .current_queue_stack
+        .last()
+        .copied()
+        .unwrap_or(MAIN_QUEUE_PTR);
+    match state.queue_specifics.get(&(current, key.to_bits())) {
+        Some(&bits) => MutVoidPtr::from_bits(bits),
+        None => MutVoidPtr::null(),
+    }
+}
+
 fn dispatch_set_finalizer_f(
     _env: &mut Environment,
     _object: MutVoidPtr,
@@ -671,6 +747,9 @@ pub const FUNCTIONS: FunctionExports = &[
     // context
     export_c_func!(dispatch_set_context(_, _)),
     export_c_func!(dispatch_get_context(_)),
+    export_c_func!(dispatch_queue_set_specific(_, _, _, _)),
+    export_c_func!(dispatch_queue_get_specific(_, _)),
+    export_c_func!(dispatch_get_specific(_)),
     export_c_func!(dispatch_set_finalizer_f(_, _)),
     export_c_func!(dispatch_set_target_queue(_, _)),
     // main

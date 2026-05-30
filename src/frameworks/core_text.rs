@@ -36,7 +36,7 @@
 use crate::dyld::{ConstantExports, FunctionExports, HostConstant, HostDylib, export_c_func};
 use crate::Environment;
 use crate::frameworks::core_graphics::CGFloat;
-use crate::mem::ConstVoidPtr;
+use crate::mem::{ConstVoidPtr, MutPtr};
 
 
 /// Opaque CoreText font reference.
@@ -62,8 +62,34 @@ fn CTFontCreateWithGraphicsFont(
     crate::objc::nil
 }
 
+/// `bool CTFontManagerRegisterGraphicsFont(CGFontRef font, CFErrorRef *error)`
+///
+/// Registers a graphics font so it can be looked up by name. touchHLE does not
+/// maintain a CoreText font registry (text is rendered via UIKit/UIFont), but
+/// the API contract is: return `true` on success and `false` with `*error`
+/// set on failure. A valid (non-NULL) `CGFont` registers successfully; a NULL
+/// font is the documented failure case.
+///
+/// Reference: <https://developer.apple.com/documentation/coretext/1499468-ctfontmanagerregistergraphicsfon>
+fn CTFontManagerRegisterGraphicsFont(
+    env: &mut Environment,
+    font: ConstVoidPtr,    // CGFontRef
+    error: MutPtr<crate::objc::id>, // CFErrorRef*
+) -> bool {
+    if !error.is_null() {
+        env.mem.write(error, crate::objc::nil);
+    }
+    if font.is_null() {
+        log_dbg!("CTFontManagerRegisterGraphicsFont: NULL font, returning false");
+        return false;
+    }
+    log_dbg!("CTFontManagerRegisterGraphicsFont: accepting font, returning true");
+    true
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CTFontCreateWithGraphicsFont(_, _, _, _)),
+    export_c_func!(CTFontManagerRegisterGraphicsFont(_, _)),
 ];
 
 pub const CONSTANTS: ConstantExports = &[

@@ -65,6 +65,10 @@ pub(crate) struct UIViewControllerHostObject {
     /// controller (retained). `nil` when the VC was instantiated outside
     /// of a storyboard.
     pub(crate) storyboard: id,
+    /// Backing store for `extendedLayoutIncludesOpaqueBars` (default `false`,
+    /// matching UIKit). See
+    /// <https://developer.apple.com/documentation/uikit/uiviewcontroller/1621515-extendedlayoutincludesopaquebars>.
+    extended_layout_includes_opaque_bars: bool,
 }
 impl HostObject for UIViewControllerHostObject {}
 
@@ -396,6 +400,20 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (bool)wantsFullScreenLayout {
     // Always report YES since touchHLE renders games full-screen.
     true
+}
+- (())setExtendedLayoutIncludesOpaqueBars:(bool)value {
+    // iOS 7+ layout hint: whether the extended layout includes the area
+    // behind opaque bars. touchHLE renders full-screen and does not model
+    // bar opacity insets, so we faithfully store the value (for the getter)
+    // but it has no layout effect.
+    env.objc
+        .borrow_mut::<UIViewControllerHostObject>(this)
+        .extended_layout_includes_opaque_bars = value;
+}
+- (bool)extendedLayoutIncludesOpaqueBars {
+    env.objc
+        .borrow::<UIViewControllerHostObject>(this)
+        .extended_layout_includes_opaque_bars
 }
 
 - (())dismissModalViewControllerAnimated:(bool)animated {

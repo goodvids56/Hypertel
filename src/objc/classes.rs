@@ -694,55 +694,43 @@ impl ObjC {
                 self.register_static_object(metaclass, metaclass_host_object);
                 name
             } else {
-                let mut class_host_object = Box::new(ClassHostObject::from_bin(
+                let class_host_object = Box::new(ClassHostObject::from_bin(
                     class, /* is_metaclass: */ false, mem, self,
                 ));
                 let mut metaclass_host_object = Box::new(ClassHostObject::from_bin(
                     metaclass, /* is_metaclass: */ true, mem, self,
                 ));
                 // Apple's Objective-C runtime guarantees that a class and its
-                // metaclass share the same NUL-terminated UTF-8 name (see
-                // `class_getName` in <objc/runtime.h>). When the binary is
-                // corrupted (e.g. partially-decrypted FairPlay IPA) `from_bin`
-                // falls back to a synthetic placeholder derived from the
-                // object's own pointer — but the class and metaclass are at
-                // different addresses, so their placeholders diverge and the
-                // assertion below trips. Force them back into agreement by
-                // using the class's name (or, if only the metaclass name was
-                // readable, the metaclass's name) for both sides.
+                // metaclass always share the same NUL-terminated UTF-8 name:
+                // `class_getName(cls)` and `class_getName(object_getClass(cls))`
+                // return the identical string (see <objc/runtime.h>). In a
+                // healthy Mach-O the `class_rw_t.name` pointer of the class and
+                // its metaclass point at the very same C string. Real-world
+                // binaries break this in two ways: (1) partially-decrypted
+                // FairPlay IPAs whose `__objc_classname` bytes are unreadable,
+                // so `from_bin` substitutes a per-pointer synthetic placeholder
+                // that necessarily diverges between class and metaclass; and
+                // (2) clobbered `__TEXT` segments where the metaclass name
+                // pointer reads a *different* but still valid-UTF-8 string.
+                // Apple's runtime never crashes on either; it simply uses the
+                // class's name. Mirror that: treat the class side as canonical
+                // and force the metaclass to match, unconditionally. This
+                // removes the previous `assert!` that aborted the whole VM
+                // (observed with GameStop_iOS, whose class/metaclass names were
+                // both readable yet mismatched).
                 if class_host_object.name != metaclass_host_object.name {
-                    let class_synthetic = class_host_object
-                        .name
-                        .starts_with("_touchHLE_UnreadableClass_");
-                    let metaclass_synthetic = metaclass_host_object
-                        .name
-                        .starts_with("_touchHLE_UnreadableClass_");
-                    if class_synthetic || metaclass_synthetic {
-                        let canonical = if !class_synthetic {
-                            class_host_object.name.clone()
-                        } else if !metaclass_synthetic {
-                            metaclass_host_object.name.clone()
-                        } else {
-                            // Both are synthetic; prefer the class pointer
-                            // (the conventional Apple-runtime side) so the
-                            // pair gets a single stable identity.
-                            class_host_object.name.clone()
-                        };
-                        log!(
-                            "Note: harmonizing mismatched class/metaclass \
-                             names ({:?} vs {:?}) to {:?} for unreadable \
-                             class at {:?}/{:?}.",
-                            class_host_object.name,
-                            metaclass_host_object.name,
-                            canonical,
-                            class,
-                            metaclass,
-                        );
-                        class_host_object.name = canonical.clone();
-                        metaclass_host_object.name = canonical;
-                    }
+                    log!(
+                        "Note: harmonizing mismatched class/metaclass names \
+                         ({:?} vs {:?}) to {:?} for class at {:?}/{:?} (Apple's \
+                         runtime guarantees they are identical).",
+                        class_host_object.name,
+                        metaclass_host_object.name,
+                        class_host_object.name,
+                        class,
+                        metaclass,
+                    );
+                    metaclass_host_object.name = class_host_object.name.clone();
                 }
-                assert!(class_host_object.name == metaclass_host_object.name);
                 let name = class_host_object.name.clone();
 
                 self.register_static_object(class, class_host_object);
@@ -1770,21 +1758,64 @@ pub fn objc_retainAutorelease(env: &mut crate::Environment, obj: id) -> id {
     obj
 }
 
-/// `id objc_retainBlock(id block)` — ARC's runtime helper for retaining
-/// a block. Per Apple's clang ARC spec
-/// (<https://clang.llvm.org/docs/AutomaticReferenceCounting.html#runtime-support>)
-/// and the libobjc source for `objc_retainBlock`, it is functionally
-/// equivalent to `_Block_copy`: when the block is a global block (the
-/// common case for blocks captured from a Mach-O literal) it returns the
-/// same pointer; when the block lives on the stack it copies it to the
-/// heap and returns the heap pointer. touchHLE only implements global
-/// blocks today, so deferring to `_Block_copy`'s no-op path matches
-/// Apple's semantics for the cases we encounter.
-pub fn objc_retainBlock(env: &mut crate::Environment, block: id) -> id {
-    if !block.is_null() {
-        crate::objc::retain(env, block);
+/// `id objc_alloc(Class cls)` — ARC/libobjc fast-path allocator. Apple's
+/// objc4 runtime (`NSObject.mm`, `objc_alloc`) implements this as
+/// `callAlloc(cls, /*checkNil=*/true, /*allocWithZone=*/false)`, which for a
+/// class that does not override `+allocWithZone:` is exactly equivalent to
+/// `[cls alloc]`. Forwarding the `alloc` selector reproduces that behaviour
+/// precisely, including honouring any class that provides its own `+alloc`.
+/// Compilers emit calls to this helper instead of an `objc_msgSend(cls,
+/// @selector(alloc))` to save a selector lookup, so it must really allocate
+/// — a return-0 stub leaves the guest with a nil object and crashes later.
+pub fn objc_alloc(env: &mut crate::Environment, cls: Class) -> id {
+    if cls.is_null() {
+        return nil;
     }
+    crate::objc::msg![env; cls alloc]
+}
+
+/// `id objc_autorelease(id obj)` — ARC/libobjc fast-path autorelease. objc4
+/// implements it as `obj ? obj->autorelease() : nil`: the object is added to
+/// the current autorelease pool and returned unchanged. touchHLE's
+/// `autorelease` helper does exactly this (with a nil fast path), so we
+/// forward to it. This is the real implementation, not a stub: returning 0
+/// here would hand the guest a nil where it expects its object back.
+pub fn objc_autorelease(env: &mut crate::Environment, obj: id) -> id {
+    crate::objc::autorelease(env, obj)
+}
+
+/// `id objc_retainBlock(id block)` — ARC runtime helper for retaining a
+/// block. Apple's objc4 runtime (`NSObject.mm`) implements this as a thin
+/// wrapper around the Blocks runtime:
+///
+/// ```text
+/// id objc_retainBlock(id x) { return (id)_Block_copy(x); }
+/// ```
+///
+/// touchHLE's `_Block_copy` (see `src/libc/blocks.rs`) does not physically
+/// duplicate the block — global blocks (the common case for static literal
+/// blocks) are not reference-counted, and stack-block promotion needs deeper
+/// Block ABI work — so it returns the same pointer. Mirroring that here keeps
+/// `objc_retainBlock` consistent with the rest of the Block runtime, while
+/// still providing the correct return value the ARC-generated code expects.
+pub fn objc_retainBlock(env: &mut crate::Environment, block: id) -> id {
+    let _ = env;
     block
+}
+
+/// `id objc_unsafeClaimAutoreleasedReturnValue(id obj)` — ARC runtime
+/// optimisation counterpart to `objc_retainAutoreleasedReturnValue`. Apple's
+/// objc4 runtime uses it when a returned object is consumed by code that does
+/// *not* want an owning reference (e.g. the result is immediately passed on,
+/// or stored `__unsafe_unretained`): it accepts the autoreleased value and
+/// claims it without adding a retain, balancing the optimised return sequence.
+/// In touchHLE's serialised execution model there is no retain/autorelease
+/// elision to undo, so the correct behaviour is to return the object
+/// unchanged (and nil-safe). See `objc4` `NSObject.mm`,
+/// `objc_unsafeClaimAutoreleasedReturnValue`.
+pub fn objc_unsafeClaimAutoreleasedReturnValue(env: &mut crate::Environment, obj: id) -> id {
+    let _ = env;
+    obj
 }
 
 // === Additional ObjC runtime helpers used by iOS 5/6 Cocoa classes ===

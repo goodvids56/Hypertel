@@ -153,7 +153,13 @@ fn CGFontCreateWithDataProvider(
         return Ptr::null();
     }
     let bytes = cg_data_provider::borrow_bytes(env, provider).to_vec();
-    let font = Font::from_vec(bytes);
+    // Per Apple's Core Graphics documentation, CGFontCreateWithDataProvider
+    // returns NULL if a font can't be created from the provided data, rather
+    // than crashing. Honour that contract instead of panicking on bad data.
+    let Some(font) = Font::from_vec(bytes) else {
+        log!("CGFontCreateWithDataProvider: could not parse font data; returning NULL");
+        return Ptr::null();
+    };
     let host_obj = Box::new(CGFontHostObject { font });
     let class = env.objc.get_known_class("_touchHLE_CGFont", &mut env.mem);
     env.objc.alloc_object(class, host_obj, &mut env.mem)

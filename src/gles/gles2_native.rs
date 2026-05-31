@@ -1032,6 +1032,33 @@ impl GLES for GLES2Native<'_> {
     unsafe fn GetVertexAttribfv(&mut self, index: GLuint, pname: GLenum, params: *mut GLfloat) {
         gles2::GetVertexAttribfv(index, pname, params)
     }
+    unsafe fn GetVertexAttribPointerv(
+        &mut self,
+        index: GLuint,
+        pname: GLenum,
+        pointer: *mut *mut GLvoid,
+    ) {
+        gles2::GetVertexAttribPointerv(index, pname, pointer)
+    }
+
+    // Vertex array objects (GL_OES_vertex_array_object)
+    fn supports_vao_oes(&self) -> bool {
+        gles2::BindVertexArrayOES::is_loaded()
+            && gles2::GenVertexArraysOES::is_loaded()
+            && gles2::DeleteVertexArraysOES::is_loaded()
+    }
+    unsafe fn BindVertexArrayOES(&mut self, array: GLuint) {
+        gles2::BindVertexArrayOES(array)
+    }
+    unsafe fn GenVertexArraysOES(&mut self, n: GLsizei, arrays: *mut GLuint) {
+        gles2::GenVertexArraysOES(n, arrays)
+    }
+    unsafe fn DeleteVertexArraysOES(&mut self, n: GLsizei, arrays: *const GLuint) {
+        gles2::DeleteVertexArraysOES(n, arrays)
+    }
+    unsafe fn IsVertexArrayOES(&mut self, array: GLuint) -> GLboolean {
+        gles2::IsVertexArrayOES(array)
+    }
 
     // Uniforms
     unsafe fn Uniform1f(&mut self, location: GLint, v0: GLfloat) {

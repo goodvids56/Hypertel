@@ -726,6 +726,15 @@ impl Mem {
         Ptr::from_bits(u32::try_from(guest_addr).unwrap())
     }
 
+    /// Returns whether a host pointer addresses a location inside the guest's
+    /// memory region. Used to sanity-check pointers that touchHLE hands to host
+    /// APIs (e.g. client-side OpenGL vertex arrays): a pointer outside this
+    /// range is wild and dereferencing it on the host would crash the emulator.
+    pub fn is_host_ptr_in_guest_mem(&self, host_ptr: *const std::ffi::c_void) -> bool {
+        let host_ptr = host_ptr.cast::<u8>();
+        self.bytes().as_ptr_range().contains(&host_ptr)
+    }
+
     /// Read a value for memory.
     /// This is the preferred way to read memory in
     /// most cases.

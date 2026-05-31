@@ -33,6 +33,7 @@ pub mod keymgr;
 pub mod libkern;
 pub mod mach;
 pub mod mach_o;
+pub mod malloc;
 pub mod math;
 pub mod mmap;
 pub mod net;
@@ -100,6 +101,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         mach::time::FUNCTIONS,
         mach::vm_map::FUNCTIONS,
         mach_o::FUNCTIONS,
+        malloc::FUNCTIONS,
         math::FUNCTIONS,
         mmap::FUNCTIONS,
         net::if_::FUNCTIONS,
@@ -143,9 +145,10 @@ pub struct State {
     dirent: dirent::State,
     dispatch: dispatch::State,
     keymgr: keymgr::State,
+    malloc: malloc::State,
     math: math::State,
     netdb: netdb::State,
-    posix_io: posix_io::State,
+    pub posix_io: posix_io::State,
     pub pthread: pthread::State,
     pub semaphore: semaphore::State,
     pub socket: sys::socket::State,

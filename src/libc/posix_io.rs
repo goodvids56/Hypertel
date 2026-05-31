@@ -35,6 +35,17 @@ impl State {
             .get_mut(fd_to_file_idx(fd))
             .and_then(|file_or_none| file_or_none.as_mut())
     }
+
+    /// Whether `fd` refers to a currently-open regular file descriptor (i.e.
+    /// not one of the std streams, and not a closed/invalid descriptor).
+    pub fn is_fd_open(&self, fd: FileDescriptor) -> bool {
+        if fd < NORMAL_FILENO_BASE {
+            return false;
+        }
+        self.files
+            .get(fd_to_file_idx(fd))
+            .is_some_and(|file_or_none| file_or_none.is_some())
+    }
 }
 
 /// A single byte-range advisory lock recorded against a file descriptor.
@@ -1204,9 +1215,35 @@ fn writev(
     written_bytes
 }
 
+fn truncate(env: &mut Environment, path_ptr: ConstPtr<u8>, len: off_t) -> i32 {
+    // TODO: handle errno properly
+    set_errno(env, 0);
+
+    let path_string = match env.mem.cstr_at_utf8(path_ptr) {
+        Ok(s) => s.to_owned(),
+        Err(_) => {
+            return -1; // TODO: set errno
+        }
+    };
+
+    let fd = open_direct(env, path_ptr, O_WRONLY);
+    if fd < 0 {
+        log_dbg!("truncate('{}', {}) => -1", path_string, len);
+        return -1;
+    }
+
+    let res = ftruncate(env, fd, len);
+
+    close(env, fd);
+
+    log_dbg!("truncate('{}', {}) => {}", path_string, len, res);
+    res
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(open(_, _, _)),
     export_c_func!(creat(_, _)),
+    export_c_func!(truncate(_, _)),
     export_c_func!(read(_, _, _)),
     export_c_func!(pread(_, _, _, _)),
     export_c_func!(write(_, _, _)),

@@ -347,11 +347,12 @@ jobs:
         run: ./dev-scripts/hypertel-should-release.sh
 
   publish-hypertel-release:
-    needs: [check-hypertel-release, build-osx, build-android, build-win]
+    needs: [check-hypertel-release, build-osx, build-linux, build-android, build-win]
     if: >-
       needs.check-hypertel-release.result == 'success' &&
       needs.check-hypertel-release.outputs.should_release == 'true' &&
       needs.build-osx.result == 'success' &&
+      needs.build-linux.result == 'success' &&
       needs.build-android.result == 'success' &&
       needs.build-win.result == 'success'
     runs-on: ubuntu-latest
@@ -378,6 +379,11 @@ jobs:
         with:
           name: touchHLE_Windows_x86_64
           path: artifacts/windows
+      - name: Download Linux artifact
+        uses: actions/download-artifact@main
+        with:
+          name: touchHLE_Linux_x86_64
+          path: artifacts/linux
       - name: Install packaging tools
         run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq pandoc zip
       - name: Package Hypertel release files

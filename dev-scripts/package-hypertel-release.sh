@@ -24,6 +24,17 @@ do
     fi
 done
 
+linux_bin=""
+for candidate in \
+    artifacts/linux/touchHLE \
+    artifacts/linux/touchHLE_linux_bundle/touchHLE
+do
+    if [ -e "$candidate" ]; then
+        linux_bin="$candidate"
+        break
+    fi
+done
+
 for path in artifacts/macos/touchHLE.dmg artifacts/android/touchHLE.apk; do
     if [ ! -e "$path" ]; then
         echo "Missing build artifact (all platform builds must succeed): $path" >&2
@@ -32,6 +43,10 @@ for path in artifacts/macos/touchHLE.dmg artifacts/android/touchHLE.apk; do
 done
 if [ -z "$windows_exe" ]; then
     echo "Missing build artifact (all platform builds must succeed): artifacts/windows/touchHLE.exe" >&2
+    exit 1
+fi
+if [ -z "$linux_bin" ]; then
+    echo "Missing build artifact (all platform builds must succeed): artifacts/linux/touchHLE" >&2
     exit 1
 fi
 
@@ -96,3 +111,6 @@ prefix="Hypertel_${VERSION}"
 ./prepare-release.sh --create-zip-windows \
     "$ROOT/$windows_exe" \
     -o "$ROOT/release/${prefix}_Windows_x86_64.zip"
+./prepare-release.sh --create-zip-linux \
+    "$ROOT/$linux_bin" \
+    -o "$ROOT/release/${prefix}_Linux_x86_64.zip"

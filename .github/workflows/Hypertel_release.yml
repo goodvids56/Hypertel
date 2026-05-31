@@ -129,6 +129,7 @@ jobs:
             pkg-config \
             libasound2-dev \
             libpulse-dev \
+            libsndio-dev \
             libdbus-1-dev \
             libudev-dev \
             libx11-dev \

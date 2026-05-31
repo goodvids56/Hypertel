@@ -413,6 +413,12 @@ pub struct GLES1OnGL2State {
     pointer_is_fixed_point: [bool; ARRAYS.len()],
     fixed_point_texture_units: HashSet<GLenum>,
     fixed_point_translation_buffers: [Vec<GLfloat>; ARRAYS.len()],
+    /// Set while the guest has selected a matrix mode we don't emulate, such
+    /// as `GL_MATRIX_PALETTE_OES` (0x8840) from `OES_matrix_palette`. Desktop
+    /// GL 2.1 has no fixed-function palette skinning, so we drop matrix-stack
+    /// writes while this is set rather than corrupting the real
+    /// MODELVIEW/PROJECTION/TEXTURE matrices (or panicking).
+    unsupported_matrix_mode: bool,
 }
 
 pub struct GLES1OnGL2Context {
@@ -432,6 +438,7 @@ impl GLESContext for GLES1OnGL2Context {
                 pointer_is_fixed_point: [false; ARRAYS.len()],
                 fixed_point_texture_units: HashSet::new(),
                 fixed_point_translation_buffers: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
+                unsupported_matrix_mode: false,
             },
             is_loaded: false,
         })
@@ -2318,30 +2325,69 @@ impl GLES for GLES1OnGL2<'_> {
 
     // Matrix stack operations
     unsafe fn MatrixMode(&mut self, mode: GLenum) {
-        assert!(mode == gl21::MODELVIEW || mode == gl21::PROJECTION || mode == gl21::TEXTURE);
+        if mode != gl21::MODELVIEW && mode != gl21::PROJECTION && mode != gl21::TEXTURE {
+            // Modes such as GL_MATRIX_PALETTE_OES (0x8840) come from
+            // OES_matrix_palette, which desktop GL 2.1 can't emulate via the
+            // fixed-function pipeline. Apps that use it normally check for the
+            // extension first and fall back to CPU skinning (we no longer
+            // advertise it), but tolerate a stray call here instead of
+            // panicking, and suppress matrix writes until a supported mode is
+            // selected again so we don't clobber the real matrices.
+            if !self.state.unsupported_matrix_mode {
+                log!(
+                    "Warning: glMatrixMode({:#x}) selected an unsupported matrix mode; \
+                     ignoring matrix-stack writes until a supported mode is selected",
+                    mode
+                );
+            }
+            self.state.unsupported_matrix_mode = true;
+            return;
+        }
+        self.state.unsupported_matrix_mode = false;
         gl21::MatrixMode(mode);
     }
     unsafe fn LoadIdentity(&mut self) {
+        if self.state.unsupported_matrix_mode {
+            return;
+        }
         gl21::LoadIdentity();
     }
     unsafe fn LoadMatrixf(&mut self, m: *const GLfloat) {
+        if self.state.unsupported_matrix_mode {
+            return;
+        }
         gl21::LoadMatrixf(m);
     }
     unsafe fn LoadMatrixx(&mut self, m: *const GLfixed) {
+        if self.state.unsupported_matrix_mode {
+            return;
+        }
         let matrix = matrix_fixed_to_float(m);
         gl21::LoadMatrixf(matrix.as_ptr());
     }
     unsafe fn MultMatrixf(&mut self, m: *const GLfloat) {
+        if self.state.unsupported_matrix_mode {
+            return;
+        }
         gl21::MultMatrixf(m);
     }
     unsafe fn MultMatrixx(&mut self, m: *const GLfixed) {
+        if self.state.unsupported_matrix_mode {
+            return;
+        }
         let matrix = matrix_fixed_to_float(m);
         gl21::MultMatrixf(matrix.as_ptr());
     }
     unsafe fn PushMatrix(&mut self) {
+        if self.state.unsupported_matrix_mode {
+            return;
+        }
         gl21::PushMatrix();
     }
     unsafe fn PopMatrix(&mut self) {
+        if self.state.unsupported_matrix_mode {
+            return;
+        }
         gl21::PopMatrix();
     }
     unsafe fn Orthof(

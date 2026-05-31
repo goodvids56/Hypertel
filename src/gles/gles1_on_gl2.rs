@@ -769,8 +769,18 @@ impl GLES for GLES1OnGL2<'_> {
                 "Tolerating glEnableClientState({:#x}) of a capability",
                 array
             );
-        } else {
-            assert!(ARRAYS.iter().any(|&ArrayInfo { name, .. }| name == array));
+        } else if !ARRAYS.iter().any(|&ArrayInfo { name, .. }| name == array) {
+            // GL_POINT_SIZE_ARRAY_OES (GL_OES_point_size_array) — and any other
+            // client array desktop GL 2.1 doesn't recognise — is not in ARRAYS.
+            // Per-vertex point sizes fall back to the scalar glPointSize (see
+            // PointSizePointerOES), so just tolerate the toggle. Forwarding the
+            // enum to gl21 would raise GL_INVALID_ENUM, so return early instead
+            // of crashing (Flick Kick Football enables this for its particles).
+            log_dbg!(
+                "Tolerating glEnableClientState({:#x}) of unsupported/unknown array",
+                array
+            );
+            return;
         }
         gl21::EnableClientState(array);
     }
@@ -780,8 +790,14 @@ impl GLES for GLES1OnGL2<'_> {
                 "Tolerating glDisableClientState({:#x}) of a capability",
                 array
             );
-        } else {
-            assert!(ARRAYS.iter().any(|&ArrayInfo { name, .. }| name == array));
+        } else if !ARRAYS.iter().any(|&ArrayInfo { name, .. }| name == array) {
+            // See EnableClientState: tolerate GL_POINT_SIZE_ARRAY_OES and other
+            // arrays gl21 doesn't recognise instead of crashing.
+            log_dbg!(
+                "Tolerating glDisableClientState({:#x}) of unsupported/unknown array",
+                array
+            );
+            return;
         }
         gl21::DisableClientState(array);
     }

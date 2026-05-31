@@ -5,7 +5,7 @@ set -e
 # touchHLE to run (the same ones found in the macOS .app bundle or Android APK).
 # This does not prepare a full release.
 
-if [[ $# == 1 ]]; then
+if [ "$#" -eq 1 ]; then
     PATH_TO_BINARY="$1"
     shift
 

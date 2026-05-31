@@ -274,7 +274,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let orig_nss: id = msg![env; coder decodeObjectForKey:orig_key];
     let orig = to_rust_string(env, orig_nss);
 
-    log!("[DEBUG NIB] UIClassSwapper loading class: {} (original: {})", name, orig);
+    log_dbg!("UIClassSwapper loading class: {} (original: {})", name, orig);
 
     // Use try_get_known_class so the lookup returns None instead of
     // panicking if the app references a custom class (e.g. FirstViewController
@@ -283,24 +283,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     let selected_class = {
         let problematic_views = ["FBLoginButton"];
         let mut c = if problematic_views.iter().any(|&prob| name == prob) {
-            log!("[DEBUG NIB] Warning: Substituting {} with generic UIView", name);
+            log!("Warning: Substituting {} with generic UIView", name);
             None
         } else {
             env.objc.try_get_known_class(&name, &mut env.mem)
         };
 
         if c.is_none() {
-            log!("[DEBUG NIB] Warning: Custom class {} not found. Falling back to original: {}", name, orig);
+            log!("Warning: Custom class {} not found. Falling back to original: {}", name, orig);
             c = env.objc.try_get_known_class(&orig, &mut env.mem);
         }
 
         if c.is_none() {
-            log!("[DEBUG NIB] Warning: Original class {} not found either. Falling back to UIView.", orig);
+            log!("Warning: Original class {} not found either. Falling back to UIView.", orig);
             c = env.objc.try_get_known_class("UIView", &mut env.mem);
         }
 
         c.unwrap_or_else(|| {
-            log!("[DEBUG NIB] CRITICAL: Fallback class not found! Falling back to NSObject.");
+            log!("CRITICAL: Fallback class not found! Falling back to NSObject.");
             env.objc.get_known_class("NSObject", &mut env.mem)
         })
     };

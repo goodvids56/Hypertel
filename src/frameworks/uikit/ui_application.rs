@@ -546,7 +546,6 @@ pub(super) fn UIApplicationMain(
 
         let principal_class = if principal_class_name != nil {
             let name = ns_string::to_rust_string(env, principal_class_name);
-            if name.is_empty() { eprintln!("DIAG_CALLER: UIApplicationMain principal_class empty"); }
             env.objc.get_known_class(&name, &mut env.mem)
         } else {
             env.objc.get_known_class("UIApplication", &mut env.mem)
@@ -589,7 +588,6 @@ pub(super) fn UIApplicationMain(
                 let _: () = msg![env; ui_application setDelegate:ui_application];
             } else {
                 let name = ns_string::to_rust_string(env, delegate_class_name);
-                if name.is_empty() { eprintln!("DIAG_CALLER: UIApplicationMain delegate_class empty"); }
                 let class = env.objc.get_known_class(&name, &mut env.mem);
                 let delegate: id = msg![env; class new];
                 let _: () = msg![env; ui_application setDelegate:delegate];

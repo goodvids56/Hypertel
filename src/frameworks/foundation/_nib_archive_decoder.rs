@@ -487,7 +487,6 @@ fn unarchive_obj(env: &mut Environment, unarchiver: id, idx: u32) -> id {
         fallback_class_names,
         chosen_class_name
     );
-    if chosen_class_name.is_empty() { eprintln!("DIAG_CALLER: nib_archive_decoder chosen_class empty (primary {:?}, fallbacks {:?})", primary_class_name, fallback_class_names); }
     let class = env.objc.get_known_class(&chosen_class_name, &mut env.mem);
 
     let host_obj = borrow_host_obj(env, unarchiver);

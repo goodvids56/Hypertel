@@ -547,10 +547,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("[(UIViewController*){:?} viewDidLayoutSubviews]", this);
 }
 
-- (bool)isEditing {
-    false
-}
-
 - (())setEditing:(bool)editing animated:(bool)_animated {
     msg![env; this setEditing:editing]
 }
@@ -650,10 +646,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())dismissViewControllerAnimated:(bool)animated
                          completion:(id)_completion {
     msg![env; this dismissModalViewControllerAnimated:animated]
-}
-
-- (bool)wantsFullScreenLayout {
-    false
 }
 
 // Apple docs: The style used to transition the receiver's modal view controller

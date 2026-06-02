@@ -251,38 +251,6 @@ pub const CONSTANTS: &[(&str, HostConstant)] = &[
         HostConstant::NSString("UIScreenDidConnectNotification"),
     ),
     // -----------------------------------------------------------------
-    // UIApplication launch-options dictionary keys (passed in
-    // `application:didFinishLaunchingWithOptions:`).
-    // -----------------------------------------------------------------
-    (
-        "_UIApplicationLaunchOptionsURLKey",
-        HostConstant::NSString("UIApplicationLaunchOptionsURLKey"),
-    ),
-    (
-        "_UIApplicationLaunchOptionsSourceApplicationKey",
-        HostConstant::NSString("UIApplicationLaunchOptionsSourceApplicationKey"),
-    ),
-    (
-        "_UIApplicationLaunchOptionsAnnotationKey",
-        HostConstant::NSString("UIApplicationLaunchOptionsAnnotationKey"),
-    ),
-    (
-        "_UIApplicationLaunchOptionsRemoteNotificationKey",
-        HostConstant::NSString("UIApplicationLaunchOptionsRemoteNotificationKey"),
-    ),
-    (
-        "_UIApplicationLaunchOptionsLocalNotificationKey",
-        HostConstant::NSString("UIApplicationLaunchOptionsLocalNotificationKey"),
-    ),
-    (
-        "_UIApplicationLaunchOptionsLocationKey",
-        HostConstant::NSString("UIApplicationLaunchOptionsLocationKey"),
-    ),
-    (
-        "_UIApplicationLaunchOptionsNewsstandDownloadsKey",
-        HostConstant::NSString("UIApplicationLaunchOptionsNewsstandDownloadsKey"),
-    ),
-    // -----------------------------------------------------------------
     // UIPasteboard well-known pasteboard names.
     // -----------------------------------------------------------------
     (
@@ -357,32 +325,6 @@ pub const CONSTANTS: &[(&str, HostConstant)] = &[
         "_UIWindowLevelAlert",
         HostConstant::Custom(ui_window_level_alert),
     ),
-    // Status-bar orientation change notifications
-    (
-        "_UIApplicationWillChangeStatusBarOrientationNotification",
-        HostConstant::NSString("UIApplicationWillChangeStatusBarOrientationNotification"),
-    ),
-    (
-        "_UIApplicationDidChangeStatusBarOrientationNotification",
-        HostConstant::NSString("UIApplicationDidChangeStatusBarOrientationNotification"),
-    ),
-    // Status-bar frame change notifications + userInfo key.
-    (
-        "_UIApplicationWillChangeStatusBarFrameNotification",
-        HostConstant::NSString("UIApplicationWillChangeStatusBarFrameNotification"),
-    ),
-    (
-        "_UIApplicationDidChangeStatusBarFrameNotification",
-        HostConstant::NSString("UIApplicationDidChangeStatusBarFrameNotification"),
-    ),
-    (
-        "_UIApplicationStatusBarFrameUserInfoKey",
-        HostConstant::NSString("UIApplicationStatusBarFrameUserInfoKey"),
-    ),
-    (
-        "_UIApplicationStatusBarOrientationUserInfoKey",
-        HostConstant::NSString("UIApplicationStatusBarOrientationUserInfoKey"),
-    ),
     // UIViewController transition coordinator context keys (iOS 5+).
     (
         "_UITransitionContextFromViewControllerKey",
@@ -444,14 +386,6 @@ pub const CONSTANTS: &[(&str, HostConstant)] = &[
     (
         "_UIScreenModeDidChangeNotification",
         HostConstant::NSString("UIScreenModeDidChangeNotification"),
-    ),
-    // -----------------------------------------------------------------
-    // UIApplication time-change notification, per
-    // <https://developer.apple.com/documentation/uikit/uiapplication/1622987-significanttimechangenotification>.
-    // -----------------------------------------------------------------
-    (
-        "_UIApplicationSignificantTimeChangeNotification",
-        HostConstant::NSString("UIApplicationSignificantTimeChangeNotification"),
     ),
     (
         "_UIApplicationBackgroundRefreshStatusDidChangeNotification",
@@ -950,18 +884,6 @@ pub const CONSTANTS: &[(&str, HostConstant)] = &[
     (
         "_UIApplicationLaunchOptionsCloudKitShareMetadataKey",
         HostConstant::NSString("UIApplicationLaunchOptionsCloudKitShareMetadataKey"),
-    ),
-    (
-        "_UIApplicationLaunchOptionsBluetoothCentralsKey",
-        HostConstant::NSString("UIApplicationLaunchOptionsBluetoothCentralsKey"),
-    ),
-    (
-        "_UIApplicationLaunchOptionsBluetoothPeripheralsKey",
-        HostConstant::NSString("UIApplicationLaunchOptionsBluetoothPeripheralsKey"),
-    ),
-    (
-        "_UIApplicationLaunchOptionsShortcutItemKey",
-        HostConstant::NSString("UIApplicationLaunchOptionsShortcutItemKey"),
     ),
 ];
 

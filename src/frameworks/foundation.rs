@@ -778,39 +778,6 @@ pub const STUB_CONSTANTS: ConstantExports = &[
         HostConstant::NSString("NSProgressKindFile"),
     ),
     // -----------------------------------------------------------------
-    // CFError userInfo keys (CFError.h). They share storage with the
-    // toll-free-bridged NSError userInfo dictionary, so the documented
-    // literal values are exactly the NS*-prefixed names.
-    // -----------------------------------------------------------------
-    (
-        "_kCFErrorDescriptionKey",
-        HostConstant::NSString("NSDescription"),
-    ),
-    (
-        "_kCFErrorLocalizedDescriptionKey",
-        HostConstant::NSString("NSLocalizedDescription"),
-    ),
-    (
-        "_kCFErrorLocalizedFailureReasonKey",
-        HostConstant::NSString("NSLocalizedFailureReason"),
-    ),
-    (
-        "_kCFErrorLocalizedRecoverySuggestionKey",
-        HostConstant::NSString("NSLocalizedRecoverySuggestion"),
-    ),
-    (
-        "_kCFErrorUnderlyingErrorKey",
-        HostConstant::NSString("NSUnderlyingError"),
-    ),
-    (
-        "_kCFErrorURLKey",
-        HostConstant::NSString("NSURL"),
-    ),
-    (
-        "_kCFErrorFilePathKey",
-        HostConstant::NSString("NSFilePath"),
-    ),
-    // -----------------------------------------------------------------
     // CFProxySupport.h: proxy dictionary key constants.
     // -----------------------------------------------------------------
     (
@@ -1128,117 +1095,6 @@ pub const STUB_CONSTANTS: ConstantExports = &[
         HostConstant::NSString("NSHTTPCookieManagerAcceptPolicyChangedNotification"),
     ),
     // -----------------------------------------------------------------
-    // `NSURL` resource-value keys introduced in iOS 5+. Apple
-    // `NSURL.h` declares them as `NSString * const`. The literal value
-    // of each constant is its own symbol name. Apps fetch them via
-    // `getResourceValue:forKey:error:` / `setResourceValue:forKey:error:`.
-    // <https://developer.apple.com/documentation/foundation/nsurl/resource_keys>
-    // -----------------------------------------------------------------
-    (
-        "_NSURLPathKey",
-        HostConstant::NSString("NSURLPathKey"),
-    ),
-    (
-        "_NSURLNameKey",
-        HostConstant::NSString("NSURLNameKey"),
-    ),
-    (
-        "_NSURLLocalizedNameKey",
-        HostConstant::NSString("NSURLLocalizedNameKey"),
-    ),
-    (
-        "_NSURLIsRegularFileKey",
-        HostConstant::NSString("NSURLIsRegularFileKey"),
-    ),
-    (
-        "_NSURLIsDirectoryKey",
-        HostConstant::NSString("NSURLIsDirectoryKey"),
-    ),
-    (
-        "_NSURLIsSymbolicLinkKey",
-        HostConstant::NSString("NSURLIsSymbolicLinkKey"),
-    ),
-    (
-        "_NSURLIsVolumeKey",
-        HostConstant::NSString("NSURLIsVolumeKey"),
-    ),
-    (
-        "_NSURLIsHiddenKey",
-        HostConstant::NSString("NSURLIsHiddenKey"),
-    ),
-    (
-        "_NSURLIsAliasFileKey",
-        HostConstant::NSString("NSURLIsAliasFileKey"),
-    ),
-    (
-        "_NSURLFileSizeKey",
-        HostConstant::NSString("NSURLFileSizeKey"),
-    ),
-    (
-        "_NSURLFileAllocatedSizeKey",
-        HostConstant::NSString("NSURLFileAllocatedSizeKey"),
-    ),
-    (
-        "_NSURLCreationDateKey",
-        HostConstant::NSString("NSURLCreationDateKey"),
-    ),
-    (
-        "_NSURLContentAccessDateKey",
-        HostConstant::NSString("NSURLContentAccessDateKey"),
-    ),
-    (
-        "_NSURLContentModificationDateKey",
-        HostConstant::NSString("NSURLContentModificationDateKey"),
-    ),
-    (
-        "_NSURLAttributeModificationDateKey",
-        HostConstant::NSString("NSURLAttributeModificationDateKey"),
-    ),
-    (
-        "_NSURLLinkCountKey",
-        HostConstant::NSString("NSURLLinkCountKey"),
-    ),
-    (
-        "_NSURLTypeIdentifierKey",
-        HostConstant::NSString("NSURLTypeIdentifierKey"),
-    ),
-    (
-        "_NSURLLocalizedTypeDescriptionKey",
-        HostConstant::NSString("NSURLLocalizedTypeDescriptionKey"),
-    ),
-    (
-        "_NSURLLabelNumberKey",
-        HostConstant::NSString("NSURLLabelNumberKey"),
-    ),
-    (
-        "_NSURLLabelColorKey",
-        HostConstant::NSString("NSURLLabelColorKey"),
-    ),
-    (
-        "_NSURLLocalizedLabelKey",
-        HostConstant::NSString("NSURLLocalizedLabelKey"),
-    ),
-    (
-        "_NSURLEffectiveIconKey",
-        HostConstant::NSString("NSURLEffectiveIconKey"),
-    ),
-    (
-        "_NSURLCustomIconKey",
-        HostConstant::NSString("NSURLCustomIconKey"),
-    ),
-    (
-        "_NSURLParentDirectoryURLKey",
-        HostConstant::NSString("NSURLParentDirectoryURLKey"),
-    ),
-    (
-        "_NSURLVolumeURLKey",
-        HostConstant::NSString("NSURLVolumeURLKey"),
-    ),
-    (
-        "_NSURLFileResourceTypeKey",
-        HostConstant::NSString("NSURLFileResourceTypeKey"),
-    ),
-    // -----------------------------------------------------------------
     // `NSXMLParserErrorDomain` — the error domain used by NSError
     // userInfo from `<Foundation/NSXMLParser.h>`. Apple ships this as
     // `FOUNDATION_EXPORT NSString * const`; the literal value is the
@@ -1294,13 +1150,6 @@ pub const STUB_CONSTANTS: ConstantExports = &[
     (
         "_UITextInputCurrentInputModeDidChangeNotification",
         HostConstant::NSString("UITextInputCurrentInputModeDidChangeNotification"),
-    ),
-    // -----------------------------------------------------------------
-    // ImageIO constants.
-    // -----------------------------------------------------------------
-    (
-        "_kCGImagePropertyExifDictionary",
-        HostConstant::NSString("{Exif}"),
     ),
     // -----------------------------------------------------------------
     // Security constants.

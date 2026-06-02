@@ -330,22 +330,6 @@ const CONSTANTS: ConstantExports = &[
     // correct address (i.e. the object base).
     ("_OBJC_IVAR_$_NSObject.isa", HostConstant::NullPtr),
     ("_kCFTypeArrayCallBacks", HostConstant::NullPtr),
-    (
-        "_NSHTTPCookieDomain",
-        HostConstant::NSString("NSHTTPCookieDomain"),
-    ),
-    (
-        "_NSHTTPCookieValue",
-        HostConstant::NSString("NSHTTPCookieValue"),
-    ),
-    (
-        "_NSHTTPCookieName",
-        HostConstant::NSString("NSHTTPCookieName"),
-    ),
-    (
-        "_NSHTTPCookiePath",
-        HostConstant::NSString("NSHTTPCookiePath"),
-    ),
     ("_NSKeyValueChangeNewKey", HostConstant::NSString("new")),
 ];
 

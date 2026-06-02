@@ -1366,8 +1366,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     () = msg![env; layer setNeedsDisplayInRect:invalid_rect]
 }
 
-- (())setNeedsLayout { }
-
 - (CGRect)bounds {
     let layer = env.objc.borrow::<UIViewHostObject>(this).layer;
     msg![env; layer bounds]

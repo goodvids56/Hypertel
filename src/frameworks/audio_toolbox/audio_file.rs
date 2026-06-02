@@ -100,6 +100,7 @@ pub const kAudioFileReadWritePermission: AudioFilePermissions = 3;
 
 type AudioFileTypeID = u32;
 const kAudioFileCAFType: AudioFileTypeID = fourcc(b"caff");
+const kAUdioFileAIFFType: AudioFileTypeID = fourcc(b"AIFF");
 
 type AudioFilePropertyID = u32;
 pub const kAudioFilePropertyDataFormat: AudioFilePropertyID = fourcc(b"dfmt");
@@ -261,11 +262,20 @@ pub fn AudioFileOpenURL(
         );
     }
 
-    if in_file_type_hint != 0 && in_file_type_hint != kAudioFileCAFType {
-        log!(
-            "Игнорируем неизвестный тип файла {} для AudioFileOpenURL()",
-            debug_fourcc(in_file_type_hint)
-        );
+    match in_file_type_hint {
+        0 => {}
+        kAudioFileCAFType => {
+            log!("Ignoring 'caff' file type hint for AudioFileOpenURL()");
+        }
+        kAUdioFileAIFFType => {
+            log!("Ignoring 'AIFF' file type hint for AudioFileOpenURL()");
+        }
+        _ => {
+            log!(
+                "Игнорируем неизвестный тип файла {} для AudioFileOpenURL()",
+                debug_fourcc(in_file_type_hint)
+            );
+        }
     }
 
     let path = to_rust_path(env, in_file_ref);

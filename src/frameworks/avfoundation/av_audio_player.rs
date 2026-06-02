@@ -389,6 +389,10 @@ pub const CLASSES: ClassExports = objc_classes! {
         let total_packets = match target_host_obj {
             AudioFileHostObject::Real(af) => af.packet_count(),
             AudioFileHostObject::Dummy { packet_count, .. } => *packet_count,
+            AudioFileHostObject::Writable { format, ref data, .. } => {
+                let bpp = format.bytes_per_packet;
+                if bpp > 0 { data.len() as u64 / bpp as u64 } else { 0 }
+            }
         };
 
         let total_frames = total_packets * audio_desc.frames_per_packet as u64;
@@ -416,6 +420,10 @@ pub const CLASSES: ClassExports = objc_classes! {
         let total_packets = match target_host_obj {
             AudioFileHostObject::Real(af) => af.packet_count(),
             AudioFileHostObject::Dummy { packet_count, .. } => *packet_count,
+            AudioFileHostObject::Writable { format, ref data, .. } => {
+                let bpp = format.bytes_per_packet;
+                if bpp > 0 { data.len() as u64 / bpp as u64 } else { 0 }
+            }
         };
         if audio_desc.sample_rate > 0.0 && audio_desc.frames_per_packet > 0 {
             let total_frames =

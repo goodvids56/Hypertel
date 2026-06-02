@@ -121,9 +121,17 @@ pub const CONSTANTS: ConstantExports = &[
 // MARK: - Helpers
 
 fn is_known_mode(env: &mut Environment, mode: CFRunLoopMode) -> bool {
-    let default_mode = ns_string::get_static_str(env, kCFRunLoopDefaultMode);
-    let common_modes = ns_string::get_static_str(env, kCFRunLoopCommonModes);
-    msg![env; mode isEqualToString:default_mode] || msg![env; mode isEqualToString:common_modes]
+    // Accept ALL non-nil modes. iOS apps frequently use custom run loop modes
+    // (UITrackingRunLoopMode, GSEventReceiveRunLoopMode, etc.) which are all
+    // valid. Since our run loop implementation doesn't actually partition
+    // sources/timers by mode, every mode is effectively equivalent to the
+    // default mode — but rejecting unknown modes caused Astro Shark and other
+    // Unity-based games to spin-loop with "unknown mode, skipping" flooding
+    // the log.
+    if mode.is_null() {
+        return false;
+    }
+    true
 }
 
 // MARK: - Retain / Release

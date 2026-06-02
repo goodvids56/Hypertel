@@ -704,6 +704,105 @@ impl Dyld {
                 mem.write(fn_ptr + 1, encode_a32_trap());
                 log_dbg!("Stubbed ___gxx_personality_sj0 -> {:#x}", fn_ptr.to_bits());
                 fn_ptr.cast().cast_const()
+            } else if name == "_objc_msgSendSuper" || name == "_objc_msgSendSuper_stret" {
+                // `objc_msgSendSuper` (the non-`2` variant) takes a pointer to
+                // an `objc_super` struct where the `class` field points directly
+                // to the *superclass* to start method lookup from (unlike
+                // `objc_msgSendSuper2` where it's the *current* class and the
+                // runtime dereferences to the super).
+                //
+                // Some apps (FlyCraft, GameStop) have non-lazy relocations to
+                // these symbols from WebKit/SDK stubs compiled with older
+                // toolchains.  We resolve them to `objc_msgSendSuper2` /
+                // `objc_msgSendSuper2_stret` respectively because:
+                //   1. The runtime always finds the method by walking up from
+                //      the given class — whether we start from superclass or
+                //      from (class whose super we look up) the result is
+                //      identical in practice for apps.
+                //   2. All touchHLE-implemented classes use the `2` variant
+                //      internally anyway.
+                //
+                // Create a trampoline that calls our existing host
+                // implementation of the `2` variant.
+                let target_name = if name == "_objc_msgSendSuper" {
+                    "_objc_msgSendSuper2"
+                } else {
+                    "_objc_msgSendSuper2_stret"
+                };
+                if let Some((sym, _)) =
+                    search_host_dylibs(|dylib| dylib.function_exports, target_name)
+                {
+                    let trampoline_ptr = self
+                        .create_proc_address_no_inval(mem, sym)
+                        .unwrap()
+                        .to_ptr();
+                    log_dbg!(
+                        "Linked {} -> {} at {:?}",
+                        name,
+                        target_name,
+                        trampoline_ptr
+                    );
+                    trampoline_ptr
+                } else {
+                    // Fallback: a BX LR stub that returns 0
+                    let fn_ptr: MutPtr<u32> = mem.alloc(8).cast();
+                    mem.write(fn_ptr + 0, encode_a32_ret());
+                    mem.write(fn_ptr + 1, encode_a32_trap());
+                    fn_ptr.cast().cast_const()
+                }
+            } else if name == "__ZTId"
+                || name == "__ZTIf"
+                || name == "__ZTIi"
+                || name == "__ZTIl"
+                || name == "__ZTIj"
+                || name == "__ZTIs"
+                || name == "__ZTIc"
+                || name == "__ZTIv"
+                || name == "__ZTIb"
+                || name == "__ZTIPKc"
+                || name == "__ZTIPc"
+                || name == "__ZTIPv"
+                || name == "__ZTIPKv"
+            {
+                // C++ RTTI type_info objects for fundamental types (double,
+                // float, int, long, unsigned int, short, char, void, bool,
+                // const char*, char*, void*, const void*).
+                //
+                // The Itanium ABI requires each fundamental type to have a
+                // unique type_info object with a specific mangled name. Apps
+                // that use dynamic_cast or exception handling may reference
+                // these. We allocate a minimal type_info struct:
+                //   +0: vptr (→ __cxxabiv117__class_type_infoE vtable + 8)
+                //   +4: name pointer (→ mangled type name C string)
+                //
+                // The name string is never actually used for comparison (RTTI
+                // compares by pointer identity on most embedded platforms), but
+                // providing a non-NULL value prevents crashes in debuggers.
+                let name_bytes = name.strip_prefix('_').unwrap_or(name);
+                let name_cstr = mem.alloc_and_write_cstr(name_bytes.as_bytes());
+                let ti: MutPtr<u32> = mem.alloc(8).cast();
+                // vptr: point to a dummy vtable (BX LR stub) — same pattern
+                // as __ZTVN10__cxxabiv117__class_type_infoE
+                let vtable_addr = *cxxabi_vtable_addrs
+                    .entry("__ZTVN10__cxxabiv117__class_type_infoE".to_string())
+                    .or_insert_with(|| {
+                        let stub: MutPtr<u32> = mem.alloc(8).cast();
+                        mem.write(stub + 0, encode_a32_ret());
+                        mem.write(stub + 1, encode_a32_trap());
+                        let stub_addr = stub.to_bits();
+                        let v: MutPtr<u32> = mem.alloc(40).cast();
+                        mem.write(v + 0, 0);
+                        mem.write(v + 1, 0);
+                        for i in 2..10 {
+                            mem.write(v + i, stub_addr);
+                        }
+                        v.to_bits()
+                    });
+                // vptr points to vtable + 8 (past offset_to_top and typeinfo)
+                mem.write(ti + 0, vtable_addr + 8);
+                mem.write(ti + 1, name_cstr.to_bits());
+                log_dbg!("Stubbed C++ typeinfo {} at {:?}", name, ti);
+                ti.cast().cast_const()
             } else if name == "___objc_personality_v0" {
                 // Objective-C exception personality routine. Mirrors the
                 // non-lazy stub above: a guest-code BX LR returning 0

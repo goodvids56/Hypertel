@@ -502,13 +502,25 @@ impl Mem {
         }
         set.insert(key);
         let op_type = if is_write { "WRITE" } else { "READ" };
+        // Provide helpful context: small offsets are typically field accesses
+        // on a nil Objective-C object pointer (nil + ivar offset). This is
+        // defined behavior in ObjC (returns 0/nil) and is NOT a crash — just
+        // a sign that the app is accessing a nil object's fields.
+        let context = if !is_write && at < 0x1000 {
+            " (likely nil ObjC object field access — returning zero)"
+        } else if is_write && at < 0x1000 {
+            " (likely nil ObjC object field write — discarding)"
+        } else {
+            " — returning stub page"
+        };
         log!(
-            "touchHLE::mem: NULL-PAGE {} at 0x{:08x} (size: 0x{:x}) from {} \
-             — returning stub page (unique sites logged: {}/{})",
+            "touchHLE::mem: NULL-PAGE {} at 0x{:08x} (size: 0x{:x}) from {}{} \
+             (unique sites logged: {}/{})",
             op_type,
             at,
             size,
             caller,
+            context,
             set.len(),
             MAX_UNIQUE_LOGS
         );

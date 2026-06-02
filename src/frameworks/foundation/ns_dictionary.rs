@@ -733,6 +733,66 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
     true
 }
+// Some apps (e.g. Rigonauts) incorrectly call mutation methods on
+// immutable NSDictionary instances. Rather than failing with "does not
+// respond to selector", we handle these gracefully. The underlying
+// DictionaryHostObject is the same structure for both mutable and
+// immutable, so we can safely perform the mutation.
+- (())addEntriesFromDictionary:(id)other { // NSDictionary *
+    if other == nil {
+        return;
+    }
+    log_dbg!(
+        "Warning: addEntriesFromDictionary: called on immutable NSDictionary {:?}; \
+         performing mutation anyway for compatibility.",
+        this
+    );
+    let mut keys: Vec<id> = Vec::new();
+    let key_enum: id = msg![env; other keyEnumerator];
+    if key_enum == nil {
+        return;
+    }
+    loop {
+        let next: id = msg![env; key_enum nextObject];
+        if next == nil {
+            break;
+        }
+        retain(env, next);
+        keys.push(next);
+    }
+    for key in keys {
+        let val: id = msg![env; other objectForKey:key];
+        if val != nil {
+            // Use the internal insert directly since setObject:forKey:
+            // may not be declared on this class.
+            let mut host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
+            host_obj.insert(env, key, val, /* copy_key: */ true);
+            *env.objc.borrow_mut(this) = host_obj;
+        }
+        release(env, key);
+    }
+}
+
+// Some apps call setObject:forKey: on immutable dictionaries as well.
+- (())setObject:(id)object forKey:(id)key {
+    if object == nil || key == nil {
+        if key == nil {
+            log!("Warning: [NSDictionary setObject:forKey:] attempt to use nil key — ignoring");
+        }
+        if object == nil {
+            log!("Warning: [NSDictionary setObject:forKey:] attempt to insert nil object — ignoring");
+        }
+        return;
+    }
+    log_dbg!(
+        "Warning: setObject:forKey: called on immutable NSDictionary {:?}; \
+         performing mutation anyway for compatibility.",
+        this
+    );
+    let mut host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
+    host_obj.insert(env, key, object, /* copy_key: */ true);
+    *env.objc.borrow_mut(this) = host_obj;
+}
 
 @end
 

@@ -34,6 +34,13 @@ struct NSKeyedArchiverHostObject {
     current_key: Option<Uid>,
     /// map of id => Uid
     already_archived: HashMap<id, Uid>,
+    /// Set to `true` once `-finishEncoding` has been called. Any subsequent
+    /// `encode…` invocations are discarded with a warning. This is separate
+    /// from `encoded_data` because `initForWritingWithMutableData:` sets
+    /// `encoded_data` to the caller-provided NSMutableData *before* the
+    /// archiving process begins, so `encoded_data != nil` alone cannot
+    /// distinguish "in progress with external data" from "finished".
+    finished: bool,
     /// Scratch dictionary that receives writes attempted after `finishEncoding`
     /// has been called. Apple's docs state that any `encode...` invocation
     /// after `finishEncoding` raises `NSInvalidArgumentException`; rather than
@@ -66,6 +73,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         encoded_data: nil,
         current_key: None,
         already_archived,
+        finished: false,
         discarded_scope: Dictionary::new(),
     }), &mut env.mem)
 }
@@ -284,6 +292,8 @@ pub const CLASSES: ClassExports = objc_classes! {
         env.objc.borrow_mut::<NSKeyedArchiverHostObject>(this).encoded_data = encoded_data;
         retain(env, encoded_data);
     }
+    // Mark archiver as finished so any subsequent encode calls are discarded.
+    env.objc.borrow_mut::<NSKeyedArchiverHostObject>(this).finished = true;
 }
 
 - (id)encodedData {
@@ -337,8 +347,7 @@ fn get_value_to_encode_for_current_key(env: &mut Environment, archiver: id) -> &
     if env
         .objc
         .borrow::<NSKeyedArchiverHostObject>(archiver)
-        .encoded_data
-        != nil
+        .finished
     {
         log!(
             "Warning: NSKeyedArchiver: encode method called after \

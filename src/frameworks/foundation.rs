@@ -75,6 +75,7 @@ pub mod ns_hash_table;
 pub mod ns_set;
 pub mod ns_sort_descriptor;
 pub mod ns_string;
+pub mod ns_text_checking_result;
 pub mod ns_thread;
 pub mod ns_time_zone;
 pub mod ns_timer;
@@ -1673,6 +1674,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         ns_set::CLASSES,
         ns_sort_descriptor::CLASSES,
         ns_string::CLASSES,
+        ns_text_checking_result::CLASSES,
         ns_thread::CLASSES,
         ns_timer::CLASSES,
         ns_time_zone::CLASSES,

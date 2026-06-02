@@ -1021,6 +1021,24 @@ fn glDrawTexxvOES(env: &mut Environment, coords: ConstPtr<GLfixed>) {
         unsafe { gles.DrawTexxvOES(coords) }
     })
 }
+fn glDrawTexsOES(
+    env: &mut Environment,
+    x: i16,
+    y: i16,
+    z: i16,
+    width: i16,
+    height: i16,
+) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.DrawTexsOES(x, y, z, width, height)
+    })
+}
+fn glDrawTexsvOES(env: &mut Environment, coords: ConstPtr<i16>) {
+    with_ctx_and_mem(env, |gles, mem| {
+        let coords = mem.ptr_at(coords, 5);
+        unsafe { gles.DrawTexsvOES(coords) }
+    })
+}
 fn glRenderbufferStorageMultisampleAPPLE(
     env: &mut Environment,
     target: GLenum,
@@ -4722,6 +4740,8 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glDrawTexfvOES(_)),
     export_c_func!(glDrawTexivOES(_)),
     export_c_func!(glDrawTexxvOES(_)),
+    export_c_func!(glDrawTexsOES(_, _, _, _, _)),
+    export_c_func!(glDrawTexsvOES(_)),
     export_c_func!(glRenderbufferStorageMultisampleAPPLE(_, _, _, _, _)),
     export_c_func!(glResolveMultisampleFramebufferAPPLE()),
     export_c_func!(glDiscardFramebufferEXT(_, _, _)),

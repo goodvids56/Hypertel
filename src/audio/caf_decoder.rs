@@ -37,9 +37,10 @@ use std::panic::AssertUnwindSafe;
 ///
 /// Currently supported audio data formats inside the CAF container:
 /// - `lpcm` — Linear PCM (8/16/24/32-bit signed integer, big- or
-//little-endian).
-///   Float PCM is rejected.
+///   little-endian). Float PCM is rejected.
 /// - `ima4` — Apple IMA 4:1 ADPCM (mono or stereo).
+/// - `ulaw` — ITU-T G.711 µ-law 2:1 compression (8-bit → 16-bit).
+/// - `alaw` — ITU-T G.711 A-law 2:1 compression (8-bit → 16-bit).
 ///
 /// Anything else (MPEG-4 AAC, MP3, ALAC, …) is returned as `Err(())` so the
 /// caller can fall through to a different decoder.
@@ -239,9 +240,53 @@ fn decode_caf_to_pcm_inner(file: Cursor<Vec<u8>>) -> Result<SymphoniaDecodedToPc
                 }
             }
         }
-        // Compressed formats other than IMA4 (AAC, MP3, ALAC, …) — leave them
-        // for Symphonia to handle.
-        _ => return Err("format_id is not LPCM or IMA4 — leaving for Symphonia"),
+        FormatType::Ulaw => {
+            // ITU-T G.711 µ-law decoding.
+            // Each 8-bit µ-law sample expands to a 16-bit signed linear PCM
+            // sample. The CAF audio description for µ-law has:
+            //   bytes_per_packet = 1 * channels
+            //   frames_per_packet = 1
+            //   bits_per_channel = 8
+            //
+            // Reference: ITU-T Recommendation G.711 (11/88)
+            // Also: Apple Core Audio Format Specification 1.0, format ID "ulaw"
+            // https://developer.apple.com/library/archive/documentation/MusicAudio/Reference/CAFSpec/CAF_spec/CAF_spec.html
+
+            loop {
+                let pkt = match reader.next_packet() {
+                    Ok(Some(pkt)) => pkt,
+                    Ok(None) => break,
+                    Err(_) => break,
+                };
+                for &byte in &pkt {
+                    let s16 = ulaw_to_linear(byte);
+                    out_pcm.extend_from_slice(&s16.to_le_bytes());
+                }
+            }
+        }
+        FormatType::Alaw => {
+            // ITU-T G.711 A-law decoding.
+            // Each 8-bit A-law sample expands to a 16-bit signed linear PCM
+            // sample. Same packet layout as µ-law.
+            //
+            // Reference: ITU-T Recommendation G.711 (11/88)
+            // Also: Apple Core Audio Format Specification 1.0, format ID "alaw"
+
+            loop {
+                let pkt = match reader.next_packet() {
+                    Ok(Some(pkt)) => pkt,
+                    Ok(None) => break,
+                    Err(_) => break,
+                };
+                for &byte in &pkt {
+                    let s16 = alaw_to_linear(byte);
+                    out_pcm.extend_from_slice(&s16.to_le_bytes());
+                }
+            }
+        }
+        // Compressed formats other than IMA4/µ-law/A-law (AAC, MP3, ALAC, …)
+        // — leave them for Symphonia to handle.
+        _ => return Err("format_id is not LPCM, IMA4, Ulaw, or Alaw — leaving for Symphonia"),
     }
 
     if out_pcm.is_empty() {
@@ -259,4 +304,70 @@ fn decode_caf_to_pcm_inner(file: Cursor<Vec<u8>>) -> Result<SymphoniaDecodedToPc
         sample_rate,
         channels,
     })
+}
+
+
+/// Decode a single 8-bit µ-law (G.711) sample to 16-bit signed linear PCM.
+///
+/// Implementation follows the ITU-T G.711 specification. The µ-law byte is
+/// stored in complemented form (all bits inverted). After complementing, the
+/// format is: S EEE QQQQ where S=sign, E=exponent (segment), Q=quantization.
+///
+/// The bias of 0x84 (132) is subtracted after reconstruction to produce the
+/// final linear value. Output range is approximately ±32124.
+///
+/// Reference: ITU-T Rec. G.711 (11/88), Sun Microsystems public domain
+/// implementation.
+fn ulaw_to_linear(u_val: u8) -> i16 {
+    // Complement to obtain the normal µ-law value
+    let u_val = !u_val;
+
+    // Extract the segment (exponent) and quantization bits
+    let segment = ((u_val & 0x70) >> 4) as i32;
+    let quantization = (u_val & 0x0F) as i32;
+
+    // Reconstruct the magnitude: bias the quantization bits, then shift by
+    // segment, then remove the bias (0x84 = 132 = BIAS used during encoding).
+    const BIAS: i32 = 0x84;
+    let mut t = (quantization << 3) + BIAS;
+    t <<= segment;
+
+    if (u_val & 0x80) != 0 {
+        // Sign bit set means negative (after complement)
+        (BIAS - t) as i16
+    } else {
+        (t - BIAS) as i16
+    }
+}
+
+/// Decode a single 8-bit A-law (G.711) sample to 16-bit signed linear PCM.
+///
+/// Implementation follows the ITU-T G.711 specification. A-law encoding uses
+/// even-bit inversion (XOR with 0x55). After restoring, the format is:
+/// S EEE QQQQ where S=sign, E=exponent (segment), Q=quantization.
+///
+/// Output range is approximately ±32256.
+///
+/// Reference: ITU-T Rec. G.711 (11/88), Sun Microsystems public domain
+/// implementation.
+fn alaw_to_linear(a_val: u8) -> i16 {
+    // A-law uses toggle of even bits for transmission
+    let a_val = a_val ^ 0x55;
+
+    let segment = ((a_val & 0x70) >> 4) as i32;
+    let quantization = (a_val & 0x0F) as i32;
+
+    let t = if segment == 0 {
+        // For segment 0, value is (quantization << 4) + 8
+        (quantization << 4) + 8
+    } else {
+        // For segments 1-7, value is ((quantization << 4) + 0x108) << (segment - 1)
+        ((quantization << 4) + 0x108) << (segment - 1)
+    };
+
+    if (a_val & 0x80) != 0 {
+        t as i16
+    } else {
+        -(t as i16)
+    }
 }

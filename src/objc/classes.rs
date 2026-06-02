@@ -1686,6 +1686,43 @@ pub fn ___objc_personality_v0(
     // _URC_FATAL_PHASE1_ERROR
     3
 }
+
+/// `_objc_msgForward` — the ObjC runtime's message forwarding trampoline.
+///
+/// On a real device, when `objc_msgSend` cannot find an IMP for a given
+/// selector, it dispatches through `_objc_msgForward` which triggers the
+/// full forwarding chain (`forwardingTargetForSelector:`,
+/// `methodSignatureForSelector:`, `forwardInvocation:`). touchHLE does not
+/// implement this machinery; instead we provide a stub that returns nil (0).
+///
+/// This is exported so that binaries containing external relocations to
+/// `__objc_msgForward` (e.g. Cut the Rope HD) can link without errors.
+/// When the stub is actually called, the return value of nil/0 matches the
+/// behaviour of sending a message to nil — the least-surprising fallback
+/// for games that probe forwarding.
+pub fn objc_msgForward(_env: &mut crate::Environment, _receiver: id, _sel: SEL) -> id {
+    log_dbg!(
+        "_objc_msgForward called (receiver={:?}, sel={:?}) — returning nil",
+        _receiver,
+        _sel
+    );
+    nil
+}
+
+/// `_objc_msgForward_stret` — struct-return variant of `_objc_msgForward`.
+/// Same stub behaviour: returns without writing to the stret buffer.
+pub fn objc_msgForward_stret(
+    _env: &mut crate::Environment,
+    _stret: MutVoidPtr,
+    _receiver: id,
+    _sel: SEL,
+) {
+    log_dbg!(
+        "_objc_msgForward_stret called (receiver={:?}, sel={:?}) — no-op",
+        _receiver,
+        _sel
+    );
+}
 /// `void objc_storeStrong(id *location, id obj)` — ARC's strong-store
 /// runtime helper. The clang ARC specification
 /// (<https://clang.llvm.org/docs/AutomaticReferenceCounting.html#runtime-support>)

@@ -69,8 +69,15 @@ pub(crate) struct UIViewControllerHostObject {
     /// matching UIKit). See
     /// <https://developer.apple.com/documentation/uikit/uiviewcontroller/1621515-extendedlayoutincludesopaquebars>.
     extended_layout_includes_opaque_bars: bool,
+    /// Backing store for `edgesForExtendedLayout` (default
+    /// `UIRectEdgeAll` = 0xF on iOS 7+). See
+    /// <https://developer.apple.com/documentation/uikit/uiviewcontroller/1621515-edgesforextendedlayout>.
+    edges_for_extended_layout: NSUInteger,
 }
 impl HostObject for UIViewControllerHostObject {}
+
+// Apple's UIRectEdgeAll = UIRectEdgeTop|UIRectEdgeLeft|UIRectEdgeBottom|UIRectEdgeRight = 15
+const UI_RECT_EDGE_ALL: NSUInteger = 15;
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -79,7 +86,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation UIViewController: UIResponder
 
 + (id)allocWithZone:(NSZonePtr)_zone {
-    let host_object = Box::<UIViewControllerHostObject>::default();
+    let mut host_object = Box::<UIViewControllerHostObject>::default();
+    host_object.edges_for_extended_layout = UI_RECT_EDGE_ALL;
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
@@ -414,6 +422,27 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc
         .borrow::<UIViewControllerHostObject>(this)
         .extended_layout_includes_opaque_bars
+}
+
+// =========================================================================
+// MARK: - edgesForExtendedLayout (iOS 7+)
+// Reference: <https://developer.apple.com/documentation/uikit/uiviewcontroller/1621515-edgesforextendedlayout>
+// =========================================================================
+
+- (())setEdgesForExtendedLayout:(NSUInteger)edges {
+    // UIRectEdge bitmask: specifies which edges the view controller's view
+    // should extend beneath bars (status bar, navigation bar, tab bar, toolbar).
+    // touchHLE renders full-screen without system bars, so this has no visual
+    // effect, but we store the value faithfully for the getter.
+    env.objc
+        .borrow_mut::<UIViewControllerHostObject>(this)
+        .edges_for_extended_layout = edges;
+}
+
+- (NSUInteger)edgesForExtendedLayout {
+    env.objc
+        .borrow::<UIViewControllerHostObject>(this)
+        .edges_for_extended_layout
 }
 
 - (())dismissModalViewControllerAnimated:(bool)animated {

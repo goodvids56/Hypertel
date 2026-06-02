@@ -2259,6 +2259,19 @@ pub fn class_getProperty(
     };
     let name_string = name_str.to_string();
 
+    let class_name_string = env.objc.get_class_name(cls).to_owned();
+    if class_name_string == "UIScreen" && name_string == "scale" {
+        // Even if [UIScreen scale] is implemented, we're not yet having a
+        // proper support for `objc_property_t`, so we prefer to return NULL
+        // here (e.g. property is not declared).
+        // Some games (such as Mirror's Edge) check for those to conditionally
+        // apply some parameters depending on the iOS version without actually
+        // using the property.
+        // TODO: support `objc_property_t` properly
+        log!("TODO: class_getProperty(UIScreen, scale) -> NULL");
+        return ConstVoidPtr::null();
+    }
+
     // Walk the class hierarchy looking for the property.
     let mut current = cls;
     loop {

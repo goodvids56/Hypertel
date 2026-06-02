@@ -994,7 +994,15 @@ pub fn AudioFileGetProperty(
                         .write(out_property_data.cast(), frames_per_packet as f64);
                 }
                 kAudioFilePropertyFileFormat => {
-                    env.mem.write(out_property_data.cast(), kAudioFileCAFType)
+                    let bundle_id = env.bundle.bundle_identifier();
+                    if bundle_id.starts_with("com.ea.mirrorsedge.bv")
+                        || bundle_id.starts_with("com.ea.mirrorsedge.inc")
+                    {
+                        log!("Applying game-specific hack for Mirror's Edge: returning WAVE for kAudioFilePropertyFileFormat in AudioFileGetProperty()");
+                        env.mem.write(out_property_data.cast(), fourcc(b"WAVE"));
+                    } else {
+                        env.mem.write(out_property_data.cast(), kAudioFileCAFType);
+                    }
                 }
                 _ => return kAudioFileUnsupportedPropertyError,
             }

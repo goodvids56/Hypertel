@@ -54,7 +54,7 @@ rusttype = "0.9.3"
 # active patent claims. The "aac" feature only enables AAC-LC, so it's should 
 # be ok.
 # (The above statements should not understood as legal claims/advice.)
-symphonia = { version = "0.6.0-alpha.1", default-features = false, features = [
+symphonia = { version = "0.6.0", default-features = false, features = [
     # formats
     "aiff", "caf", "isomp4", "wav",
     # codecs

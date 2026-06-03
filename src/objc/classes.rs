@@ -505,6 +505,57 @@ impl ObjC {
         None
     }
 
+    /// Find a registered class that *declares* the given instance method
+    /// (by selector name), or `None` if there is no such class.
+    ///
+    /// This scans every registered class but only matches a class that
+    /// declares the method *itself* — the superclass chain is intentionally
+    /// not walked, so unrelated classes that merely inherit the method cannot
+    /// match. Classes without a real Objective-C method table (substituted
+    /// SDK classes, unimplemented-class placeholders, etc.) are skipped.
+    ///
+    /// This is used by `UIApplicationMain` to recover the application delegate
+    /// when the app neither wires it up through its main nib nor passes a
+    /// resolvable delegate class name (some binaries reach `UIApplicationMain`
+    /// with a nil/empty delegate class name, which otherwise leaves the app
+    /// with no delegate and frozen on its launch image, because
+    /// `application:didFinishLaunchingWithOptions:` is never delivered).
+    ///
+    /// When several classes match, selection is deterministic and prefers
+    /// names that look like an application delegate (e.g. `AppDelegate`,
+    /// `AppController`), so an unrelated class that happens to implement the
+    /// selector does not shadow the real delegate.
+    pub fn class_declaring_instance_method(&self, sel_name: &str) -> Option<Class> {
+        let sel = self.lookup_selector(sel_name)?;
+        // (preference rank, class name, class); lower rank wins, ties broken by
+        // name so the result does not depend on `HashMap` iteration order.
+        let mut candidates: Vec<(u8, &str, Class)> = Vec::new();
+        for (name, &class) in self.classes.iter() {
+            let Some(host_object) = self.get_host_object(class) else {
+                continue;
+            };
+            let Some(class_host_object) =
+                host_object.as_any().downcast_ref::<ClassHostObject>()
+            else {
+                continue;
+            };
+            if class_host_object.is_metaclass || !class_host_object.methods.contains_key(&sel) {
+                continue;
+            }
+            let lower = name.to_ascii_lowercase();
+            let rank = if lower.ends_with("appdelegate") || lower.ends_with("appcontroller") {
+                0
+            } else if lower.contains("delegate") {
+                1
+            } else {
+                2
+            };
+            candidates.push((rank, name.as_str(), class));
+        }
+        candidates.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(b.1)));
+        candidates.first().map(|&(_, _, class)| class)
+    }
+
     fn link_class_inner(
         &mut self,
         name: &str,

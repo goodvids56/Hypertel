@@ -991,8 +991,15 @@ pub fn handle_events(env: &mut Environment) -> Option<Instant> {
     use crate::window::Event;
     use crate::window::TextInputEvent;
 
+    // In headless mode there is no window to pull events from. This used to be
+    // assumed unreachable without a window, but an app that fully finishes
+    // launching enters the main run loop, which calls this unconditionally —
+    // so guard explicitly instead of unwrapping the absent window and panicking.
+    if env.window.is_none() {
+        return None;
+    }
+
     loop {
-        // NSRunLoop will never call this function in headless mode.
         let Some(event) = env.window_mut().pop_event() else {
             break;
         };

@@ -273,6 +273,12 @@ impl Font {
     pub fn sans_bold_ja() -> Font {
         Self::from_resource_file("NotoSansJP-Bold.otf")
     }
+    pub fn sans_regular_ar() -> Font {
+        Self::from_resource_file("NotoSansArabic-Regular.ttf")
+    }
+    pub fn sans_bold_ar() -> Font {
+        Self::from_resource_file("NotoSansArabic-Bold.ttf")
+    }
 
     pub fn ascent(&self, font_size: f32) -> f32 {
         let v_metrics = self.rt().v_metrics(scale(font_size));

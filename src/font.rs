@@ -19,6 +19,8 @@ use crate::paths;
 use rusttype::{vector, GlyphId, Point, Scale};
 use std::io::Read;
 
+mod arabic;
+
 pub struct Font {
     /// `None` only for the phantom-default `Font` returned via
     /// [`Default`] when the objc runtime needs a placeholder for a
@@ -304,7 +306,11 @@ impl Font {
         let mut line_x_min: f32 = 0.0;
         let mut line_x_max: f32 = 0.0;
 
-        for glyph in self.rt().layout(line, scale(font_size), Default::default()) {
+        // Apply Arabic shaping/reordering so the measured width matches what
+        // will actually be drawn (see [arabic::shape_line_for_display]).
+        let line = arabic::shape_line_for_display(line);
+
+        for glyph in self.rt().layout(&line, scale(font_size), Default::default()) {
             let position = glyph.position();
             let h_metrics = glyph.unpositioned().h_metrics();
 
@@ -506,8 +512,11 @@ impl Font {
 
             let baseline = origin.1 + ascent + line_idx as f32 * (line_gap + line_height);
 
+            // Reshape/reorder Arabic text into visual order before layout.
+            let shaped_line = arabic::shape_line_for_display(line_text);
+
             for glyph in self.rt().layout(
-                line_text,
+                &shaped_line,
                 scale(font_size),
                 Point {
                     x: origin.0 + line_x_offset,

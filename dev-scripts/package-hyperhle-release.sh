@@ -1,5 +1,5 @@
 #!/bin/sh
-# Package Hypertel release zips and write release notes for action-gh-release.
+# Package HyperHLE release zips and write release notes for action-gh-release.
 set -eu
 
 VERSION="$1"
@@ -53,7 +53,7 @@ fi
 if [ -z "$CHANGELOG_FROM" ]; then
     patch="${VERSION#v1.0.}"
     if [ "$patch" = "0" ]; then
-        CHANGELOG_FROM="$(git rev-list -n 1 HEAD -- dev-scripts/hypertel-should-release.sh)"
+        CHANGELOG_FROM="$(git rev-list -n 1 HEAD -- dev-scripts/hyperhle-should-release.sh)"
     else
         CHANGELOG_FROM="v1.0.$((patch - 1))"
     fi
@@ -63,8 +63,8 @@ rm -rf release
 mkdir -p release
 
 {
-    printf '%s\n\n' "Hypertel ${VERSION}"
-    if [ "${FORCE_HYPERTEL_RELEASE:-}" = "true" ]; then
+    printf '%s\n\n' "HyperHLE ${VERSION}"
+    if [ "${FORCE_HYPERHLE_RELEASE:-}" = "true" ]; then
         printf '%s\n\n' "_Manual release — changelog shows the latest 5 commits._"
     fi
     printf '%s\n\n' "## Changelog"
@@ -102,7 +102,7 @@ mkdir -p release
 cd "$ROOT/dev-scripts"
 ./prepare-release.sh --prepare-files
 
-prefix="Hypertel_${VERSION}"
+prefix="HyperHLE_${VERSION}"
 
 ./prepare-release.sh --create-zip-macos "$ROOT/artifacts/macos/touchHLE.dmg" \
     -o "$ROOT/release/${prefix}_macOS_x86_64.zip"

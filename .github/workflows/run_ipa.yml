@@ -1,14 +1,15 @@
 name: Download and run IPA
 
 # Manually-triggered workflow that downloads an `.ipa` (or zipped `.app`) from a
-# provided URL, builds touchHLE for Linux, and runs the app under touchHLE.
+# provided URL, builds touchHLE, and runs the app under touchHLE on Linux,
+# Windows and macOS.
 #
 # touchHLE normally opens a window and runs the app indefinitely, neither of
-# which suits CI, so the run is performed:
-#   * under a virtual framebuffer (xvfb) so SDL has a display to draw into, and
-#   * wrapped in `timeout` so the job finishes after a bounded number of seconds.
-# A non-zero exit purely caused by hitting that timeout is treated as success —
-# it just means the app was still running, which is the expected outcome.
+# which suits CI, so the run is bounded by `dev-scripts/ci-run-app.sh`, which
+# launches the emulator, waits a fixed number of seconds, and then stops it.
+# On Linux the run happens under a virtual framebuffer (xvfb) so SDL has a
+# display to draw into; the Windows and macOS runners can create windows
+# directly.
 
 on:
   workflow_dispatch:
@@ -37,7 +38,24 @@ concurrency:
 
 jobs:
   run-ipa:
-    runs-on: ubuntu-latest
+    name: Run on ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux
+            bin: ./target/release/touchHLE
+            boost_key: boost_1_81_0_linux
+          - os: windows-latest
+            name: Windows
+            bin: ./target/release/touchHLE.exe
+            boost_key: boost_1_81_0_windows
+          - os: macos-latest
+            name: macOS
+            bin: ./target/release/touchHLE
+            boost_key: boost_1_81_0_macos
 
     steps:
       - name: Checkout touchHLE
@@ -46,6 +64,7 @@ jobs:
           submodules: recursive
 
       - name: Install Linux build and runtime dependencies
+        if: runner.os == 'Linux'
         # SDL2 and openal-soft are built from source, so the development headers
         # for the audio, video and input backends they detect must be available.
         # `xvfb` provides a headless X server to run the GUI under.
@@ -82,15 +101,25 @@ jobs:
         uses: actions/cache@main
         with:
           path: vendor/boost
-          key: boost_1_81_0_linux
+          key: ${{ matrix.boost_key }}
 
-      - if: ${{ steps.cache-boost.outputs.cache-hit != 'true' }}
-        name: Download Boost
-        run: curl -L -O "https://archives.boost.io/release/1.81.0/source/boost_1_81_0.tar.gz"
+      # Linux and macOS use the .tar.gz; Windows uses the .7z (7z is preinstalled
+      # on the Windows runners and handles long paths more reliably there).
+      - if: ${{ steps.cache-boost.outputs.cache-hit != 'true' && runner.os != 'Windows' }}
+        name: Download and extract Boost (Linux/macOS)
+        run: |
+          curl -L -O "https://archives.boost.io/release/1.81.0/source/boost_1_81_0.tar.gz"
+          mkdir -p vendor
+          tar xzf boost_1_81_0.tar.gz -C vendor
+          mv vendor/boost_1_81_0 vendor/boost
 
-      - if: ${{ steps.cache-boost.outputs.cache-hit != 'true' }}
-        name: Extract Boost
-        run: mkdir -p vendor && tar xzf boost_1_81_0.tar.gz -C vendor && mv vendor/boost_1_81_0 vendor/boost
+      - if: ${{ steps.cache-boost.outputs.cache-hit != 'true' && runner.os == 'Windows' }}
+        name: Download Boost (Windows)
+        run: curl -L -o boost_1_81_0.7z "https://archives.boost.io/release/1.81.0/source/boost_1_81_0.7z"
+
+      - if: ${{ steps.cache-boost.outputs.cache-hit != 'true' && runner.os == 'Windows' }}
+        name: Extract Boost (Windows)
+        run: 7z -ovendor x boost_1_81_0.7z && ren vendor\boost_1_81_0 boost
 
       - name: Setup CMake
         uses: lukka/get-cmake@latest
@@ -101,6 +130,7 @@ jobs:
         run: cargo build --release
 
       - name: Download IPA
+        shell: bash
         env:
           IPA_URL: ${{ inputs.ipa_url }}
         run: |
@@ -111,40 +141,32 @@ jobs:
           # silently saving an error page as "app.ipa".
           curl -fL --retry 4 --retry-delay 2 -o downloaded_app/app.ipa "$IPA_URL"
           ls -lh downloaded_app/app.ipa
-          file downloaded_app/app.ipa || true
 
       - name: Inspect app bundle
-        run: ./target/release/touchHLE downloaded_app/app.ipa --info
+        shell: bash
+        run: ${{ matrix.bin }} downloaded_app/app.ipa --info
 
       - name: Run app under touchHLE
+        shell: bash
         env:
           RUN_SECONDS: ${{ inputs.run_seconds }}
           EXTRA_ARGS: ${{ inputs.extra_args }}
         run: |
           set -uo pipefail
-          echo "Running app for up to ${RUN_SECONDS}s..."
-          # `timeout` returns 124 when it has to kill the still-running app,
-          # which is the normal, expected case here, so don't treat that (or the
-          # SIGTERM-induced 143) as a failure.
-          set +e
-          xvfb-run -a --server-args="-screen 0 640x960x24" \
-            timeout --signal=TERM "${RUN_SECONDS}" \
-            ./target/release/touchHLE downloaded_app/app.ipa \
-              --no-error-popup ${EXTRA_ARGS} 2>&1 | tee run.log
-          status=${PIPESTATUS[0]}
-          set -e
-          echo "touchHLE exited with status ${status}"
-          if [ "${status}" -eq 0 ] || [ "${status}" -eq 124 ] || [ "${status}" -eq 143 ]; then
-            echo "App ran successfully (stopped after reaching the time limit or exited cleanly)."
-            exit 0
+          if [ "${RUNNER_OS}" = "Linux" ]; then
+            # Provide a virtual display for SDL/OpenGL on the headless runner.
+            xvfb-run -a --server-args="-screen 0 640x960x24" \
+              ./dev-scripts/ci-run-app.sh "${{ matrix.bin }}" "${RUN_SECONDS}" \
+              downloaded_app/app.ipa ${EXTRA_ARGS}
+          else
+            ./dev-scripts/ci-run-app.sh "${{ matrix.bin }}" "${RUN_SECONDS}" \
+              downloaded_app/app.ipa ${EXTRA_ARGS}
           fi
-          echo "App exited with an unexpected error status."
-          exit "${status}"
 
       - name: Upload run log
         if: always()
         uses: actions/upload-artifact@main
         with:
-          name: touchHLE_run_log
+          name: touchHLE_run_log_${{ matrix.name }}
           path: run.log
           if-no-files-found: ignore
